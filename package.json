@@ -17,7 +17,8 @@
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
     "demo": "npm run demo -w server",
     "redteam": "npm run redteam -w server",
-    "hijack": "npm run hijack -w server"
+    "hijack": "npm run hijack -w server",
+    "loop": "npm run loop -w server"
   },
   "engines": {
     "node": ">=22.13"

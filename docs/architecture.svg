@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Public Sans, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6f7f90"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c2362f"/></marker>
+  </defs>
+  <rect width="1200" height="560" fill="#eef1f4"/>
+  <text x="40" y="52" font-size="26" font-weight="700" fill="#14202b">Chaperone: purchase protection for AI agents, on PayPal</text>
+  <text x="40" y="80" font-size="15" fill="#48586a">A fooled agent can propose anything. Money only moves when code, a quarantined AI and (when needed) you agree, and only once delivery checks out.</text>
+
+  <!-- human -->
+  <rect x="40" y="110" width="250" height="86" rx="12" fill="#fff" stroke="#cfd7df"/>
+  <text x="58" y="140" font-size="16" font-weight="600" fill="#14202b">You sign a mandate once</text>
+  <text x="58" y="162" font-size="13" fill="#48586a">Gemini drafts limits from your words;</text>
+  <text x="58" y="180" font-size="13" fill="#48586a">you approve in PayPal (Vault v3)</text>
+
+  <!-- agent -->
+  <rect x="40" y="236" width="250" height="110" rx="12" fill="#fff" stroke="#cfd7df"/>
+  <text x="58" y="266" font-size="16" font-weight="600" fill="#14202b">Gemini shopping agent</text>
+  <text x="58" y="288" font-size="13" fill="#48586a">search_products → Channel3</text>
+  <text x="58" y="306" font-size="13" fill="#48586a">view_listing (untrusted pages)</text>
+  <text x="58" y="324" font-size="13" fill="#48586a">buy → proposes a PurchaseIntent</text>
+
+  <line x1="165" y1="196" x2="165" y2="232" stroke="#6f7f90" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="292" y1="290" x2="336" y2="290" stroke="#6f7f90" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- gate -->
+  <rect x="340" y="110" width="400" height="300" rx="14" fill="#d7e9e6" stroke="#0f5e5a"/>
+  <text x="360" y="140" font-size="18" font-weight="700" fill="#0f5e5a">The gate</text>
+  <rect x="360" y="156" width="360" height="54" rx="10" fill="#fff"/>
+  <text x="376" y="180" font-size="14" font-weight="600" fill="#14202b">Deterministic policy (plain code)</text>
+  <text x="376" y="199" font-size="12" fill="#48586a">caps · budget · qty · specs · lookalike stores · payee · velocity</text>
+  <rect x="360" y="218" width="360" height="44" rx="10" fill="#fff"/>
+  <text x="376" y="245" font-size="14" font-weight="600" fill="#14202b">Market price vs Channel3 offers for the same product</text>
+  <rect x="360" y="270" width="360" height="44" rx="10" fill="#fff"/>
+  <text x="376" y="297" font-size="14" font-weight="600" fill="#14202b">Injection scanner: tags, zero-width, bidi, roles</text>
+  <rect x="360" y="322" width="170" height="74" rx="10" fill="#fff"/>
+  <text x="372" y="345" font-size="13" font-weight="600" fill="#14202b">Quarantined reader</text>
+  <text x="372" y="363" font-size="12" fill="#48586a">reads the page</text>
+  <text x="372" y="380" font-size="12" fill="#48586a">outputs booleans only</text>
+  <rect x="550" y="322" width="170" height="74" rx="10" fill="#fff"/>
+  <text x="562" y="345" font-size="13" font-weight="600" fill="#14202b">Privileged auditor</text>
+  <text x="562" y="363" font-size="12" fill="#48586a">your words + facts</text>
+  <text x="562" y="380" font-size="12" fill="#48586a">never sees the page</text>
+  <line x1="530" y1="359" x2="546" y2="359" stroke="#0f5e5a" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- outcomes -->
+  <text x="360" y="440" font-size="13" fill="#c2362f">fail → BLOCK (no PayPal call)</text>
+  <text x="360" y="460" font-size="13" fill="#b8862b">warn → HOLD for your one-tap approval</text>
+  <text x="360" y="480" font-size="13" fill="#2f7d4f">pass → AUTHORIZE</text>
+
+  <line x1="742" y1="260" x2="786" y2="260" stroke="#6f7f90" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- paypal -->
+  <rect x="790" y="110" width="370" height="400" rx="14" fill="#f4e8cf" stroke="#b8862b"/>
+  <text x="810" y="140" font-size="18" font-weight="700" fill="#8a6418">PayPal holds the money</text>
+  <text x="810" y="174" font-size="14" font-weight="600" fill="#14202b">1. Orders v2 intent=AUTHORIZE</text>
+  <text x="826" y="193" font-size="12" fill="#48586a">vaulted wallet · PayPal-Request-Id idempotency</text>
+  <text x="810" y="226" font-size="14" font-weight="600" fill="#14202b">2. Delivery report arrives</text>
+  <text x="826" y="245" font-size="12" fill="#48586a">qty + spec check + quarantined manifest compare</text>
+  <text x="810" y="282" font-size="14" font-weight="600" fill="#2f7d4f">match → capture → add tracking</text>
+  <text x="826" y="301" font-size="12" fill="#48586a">→ Payouts to the verified seller</text>
+  <text x="810" y="336" font-size="14" font-weight="600" fill="#b8862b">short ship → final partial capture</text>
+  <text x="826" y="355" font-size="12" fill="#48586a">the rest is released back to you</text>
+  <text x="810" y="390" font-size="14" font-weight="600" fill="#c2362f">wrong item → void</text>
+  <text x="826" y="409" font-size="12" fill="#48586a">the money never moved</text>
+  <text x="810" y="444" font-size="14" font-weight="600" fill="#14202b">later problem → refund</text>
+  <text x="810" y="482" font-size="12" fill="#48586a">Ledger: Transaction Search · Webhooks (verified)</text>
+</svg>
