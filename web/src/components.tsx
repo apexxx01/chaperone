@@ -28,7 +28,7 @@ export function Lane({ p, current, onOpen }: { p: Purchase; current?: boolean; o
   return (
     <button className="lane" aria-current={current} onClick={onOpen} aria-label={`${l.title}, ${usd(p.amount.value)}, ${coin.label}`}>
       <span className="lane-what">
-        {l.imageUrl ? <img src={l.imageUrl} alt="" loading="lazy" /> : <span className="ph" />}
+        {l.imageUrl ? <img src={l.imageUrl} alt="" loading="lazy" /> : <span className="ph">{(l.brand ?? l.merchant.domain).slice(0, 1).toUpperCase()}</span>}
         <span className="t">
           <b>{l.title}</b>
           <span>
@@ -38,7 +38,7 @@ export function Lane({ p, current, onOpen }: { p: Purchase; current?: boolean; o
       </span>
       <span className="track" aria-hidden>
         {STOPS.map((s, i) => (
-          <span key={s} className={`stop${i <= coin.at ? " done" : ""}`}>
+          <span key={s} className={`stop${i <= coin.at ? " done" : ""}${Math.floor(coin.at) === i ? " here" : ""}`}>
             <span className="dot" />
             <span className="lbl">{s}</span>
           </span>

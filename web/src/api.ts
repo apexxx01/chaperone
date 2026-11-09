@@ -115,7 +115,7 @@ function upsert<T extends { id: string }>(list: T[], item: T, sortKey: (x: T) =>
   return next.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 }
 
-export const usd = (n: number) => `$${n.toFixed(2)}`;
+export const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const ago = (iso: string) => {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return `${Math.round(s)}s ago`;

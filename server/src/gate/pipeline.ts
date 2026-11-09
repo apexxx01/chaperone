@@ -51,13 +51,13 @@ export function riskScore(checks: Check[], findings: Finding[]): number {
 export function headline(decision: Decision, checks: Check[], intent: PurchaseIntent): string {
   const amount = round2(intent.listing.price * intent.quantity).toFixed(2);
   const first = checks.find((c) => c.outcome === "fail") ?? checks.find((c) => c.outcome === "warn");
-  if (decision === "authorize") return `Held $${amount} for ${shorten(intent.listing.title)}. Seller gets paid when it arrives as ordered.`;
-  if (decision === "hold") return `Needs you: $${amount} for ${shorten(intent.listing.title)}. ${first?.title ?? ""}.`;
-  return `Blocked $${amount} at ${intent.listing.merchant.domain}: ${first?.title ?? "policy"}.`;
+  if (decision === "authorize") return `Held $${amount} for ${shorten(intent.listing.title)}, not charged. The seller gets paid when it arrives as ordered.`;
+  if (decision === "hold") return `Needs you: $${amount} for ${shorten(intent.listing.title)}. ${(first?.title ?? "").replace(/\.$/, "")}.`;
+  return `Blocked $${amount} at ${intent.listing.merchant.domain}: ${(first?.title ?? "policy").replace(/\.$/, "")}.`;
 }
 
 function shorten(s: string, n = 48) {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  return s.length > n ? s.slice(0, n - 1).trimEnd().replace(/[,.;:]$/, "") + "…" : s;
 }
 
 export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: GateDeps): Promise<Verdict> {

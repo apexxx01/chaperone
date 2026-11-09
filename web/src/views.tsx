@@ -339,7 +339,7 @@ export function RedTeamView({ s, live, running, start }: { s: AppState; live: Ca
               <tbody>
                 {cases.map((c) => (
                   <tr key={c.id}>
-                    <td><b>{c.kind === "benign" ? "Honest purchase" : `${c.id} ${c.name}`}</b><div className="tech">{c.technique}</div></td>
+                    <td><b>{c.kind === "benign" ? `Honest purchase: ${c.task}` : `${c.id} ${c.name}`}</b><div className="tech">{c.technique}</div></td>
                     <td className="num">{c.kind === "benign" ? <span className="faint">n/a</span> : c.unprotected.captured ? <span className="lost">−{usd(c.unprotected.moved)}</span> : <span className="faint">not run</span>}</td>
                     <td><span className={`outcome ${c.protected.outcome}`}>{OUTCOME[c.protected.outcome]}</span>{c.protected.outcome === "partial_capture" && <div className="tech num">paid {usd(c.protected.moved)} of {usd(c.amount)}</div>}</td>
                     <td className="tech">{c.protected.firstCatch ?? "Every check passed"}</td>

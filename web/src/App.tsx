@@ -50,6 +50,14 @@ export function App() {
     history.replaceState(null, "", `${location.pathname}${location.search}#${tab}`);
   }, [tab]);
   useEffect(() => {
+    const onHash = () => {
+      const t = location.hash.slice(1) as Tab;
+      if (TABS.some((x) => x.id === t)) setTab(t);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  useEffect(() => {
     const q = new URLSearchParams(location.search);
     if (q.get("paypal") === "approved") notify("Approved in PayPal. Your agent can shop within these limits.");
     if (q.get("paypal") === "cancelled") notify("PayPal approval cancelled. Nothing was saved.", true);

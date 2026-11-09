@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: chaperone
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build -w web
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22.13.0"
+      - key: CHAPERONE_MODE
+        value: live
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_PAYMENT_MODE
+        value: vault
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

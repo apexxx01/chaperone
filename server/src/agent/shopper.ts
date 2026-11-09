@@ -77,7 +77,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
     buy: async (a: { listing_id: string; quantity: number; reason: string }) => {
       const l = seen.get(a.listing_id);
       if (!l) return { error: "Unknown listing id" };
-      const intent: PurchaseIntent = { id: `pi_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, mandateId: opts.mandate.id, agent: `gemini-shopper/${config.geminiModel}`, createdAt: new Date().toISOString(), listing: l, quantity: Math.max(1, Math.round(a.quantity || 1)), agentRationale: a.reason };
+      const intent: PurchaseIntent = { id: `pi_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, mandateId: opts.mandate.id, agent: config.mode === "offline" || !config.geminiKey ? "scripted-agent (offline)" : `gemini-shopper/${config.geminiModel}`, createdAt: new Date().toISOString(), listing: l, quantity: Math.max(1, Math.round(a.quantity || 1)), agentRationale: a.reason };
       if (opts.mode === "unprotected") {
         const amount = Math.round(l.price * intent.quantity * 100) / 100;
         const auth = await deps.paypal.authorize({ requestId: `naive-${intent.id}`, amount, currency: "USD", items: [{ name: l.title, quantity: intent.quantity, unitAmount: l.price }], description: `UNPROTECTED ${l.merchant.domain}`, customId: `naive_${intent.id}`, invoiceId: `NAIVE-${intent.id}` });

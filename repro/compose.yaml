@@ -1,0 +1,24 @@
+# One-command repro.
+#   Offline (no keys):   docker compose -f repro/compose.yaml up
+#   Live sandbox:        cp .env.example .env, fill keys, set CHAPERONE_MODE=live, then the same command
+services:
+  chaperone:
+    build: ..
+    ports: ["8787:8787"]
+    environment:
+      CHAPERONE_MODE: ${CHAPERONE_MODE:-offline}
+      PUBLIC_URL: http://localhost:8787
+    env_file:
+      - path: ../.env
+        required: false
+  redteam:
+    build: ..
+    profiles: ["redteam"]
+    command: ["npm", "run", "redteam"]
+    environment:
+      CHAPERONE_MODE: ${CHAPERONE_MODE:-offline}
+    env_file:
+      - path: ../.env
+        required: false
+    volumes:
+      - ./out:/app/repro/out
