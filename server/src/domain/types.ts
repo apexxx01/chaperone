@@ -41,6 +41,9 @@ export interface Mandate {
   status: MandateStatus;
   /** PayPal vault token for the wallet the human approved for this mandate. */
   paymentTokenId?: string;
+  /** Vault v3 setup token awaiting the human's approval in PayPal. */
+  setupTokenId?: string;
+  payerEmail?: string;
   paypalCustomerId?: string;
   /** Running totals, derived from the ledger. */
   committed: number;

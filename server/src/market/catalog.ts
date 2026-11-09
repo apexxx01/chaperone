@@ -96,3 +96,13 @@ export function marketFor(productId: string | undefined): MarketStats | null {
 export async function marketForIntent(intent: PurchaseIntent): Promise<MarketStats | null> {
   return marketFor(intent.listing.productId);
 }
+
+/** A cheaper, different product in the same category: what a bait-and-switch seller ships. */
+export function substituteFor(productId: string | undefined): { title: string; attributes: Record<string, string> } | null {
+  const p = productId ? products.get(productId) : undefined;
+  const cat = p?.category?.slug;
+  const alt = FIXTURE_PRODUCTS.filter((x) => x.id !== productId && (!cat || x.category?.slug === cat)).sort((a, b) => a.offers[0]!.price.price - b.offers[0]!.price.price)[0];
+  if (!alt) return null;
+  const l = listingsFor(alt)[0]!;
+  return { title: l.title, attributes: l.attributes ?? {} };
+}
