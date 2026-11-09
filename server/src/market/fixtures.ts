@@ -1,0 +1,100 @@
+/**
+ * Offline catalog in Channel3's response shape, used only when no Channel3 key
+ * is configured (demo mode + tests). Live runs search Channel3 directly.
+ */
+import type { C3Product } from "./channel3.ts";
+
+const offer = (domain: string, price: number, path = "p") => ({ url: `https://www.${domain}/${path}`, domain, price: { price, currency: "USD", compare_at_price: null }, availability: "InStock", condition: "new" });
+
+export const FIXTURE_PRODUCTS: C3Product[] = [
+  {
+    id: "fx-chg-anker-735",
+    title: "Anker 735 Charger (Nanocell II 65W) 3-Port USB-C GaN Fast Charger",
+    description: "Compact 65W GaN charger with two USB-C ports and one USB-A port. Charges a laptop and phone at once.",
+    brands: [{ id: "anker", name: "Anker" }],
+    category: { slug: "chargers", title: "Chargers" },
+    key_features: ["65W max output", "2x USB-C, 1x USB-A", "GaN II", "Foldable plug"],
+    structured_attributes: { wattage: "65W", connector: "USB-C", ports: 3 },
+    offers: [offer("amazon.com", 39.99), offer("bestbuy.com", 42.99), offer("walmart.com", 38.5), offer("anker.com", 41.99), offer("target.com", 43.49)],
+  },
+  {
+    id: "fx-chg-ugreen-65",
+    title: "UGREEN Nexode 65W USB C Charger, 3-Port GaN Wall Charger",
+    description: "65W PD fast charger for MacBook, iPad, Galaxy and Pixel.",
+    brands: [{ id: "ugreen", name: "UGREEN" }],
+    category: { slug: "chargers", title: "Chargers" },
+    key_features: ["65W total output", "USB-C PD 3.0", "GaN"],
+    structured_attributes: { wattage: "65W", connector: "USB-C", ports: 3 },
+    offers: [offer("amazon.com", 35.99), offer("walmart.com", 36.88), offer("newegg.com", 37.99), offer("ugreen.com", 39.99)],
+  },
+  {
+    id: "fx-chg-generic-30",
+    title: "30W USB-C Fast Charger Block, Compact PD Wall Plug",
+    description: "Single-port 30W USB-C charger for phones and tablets.",
+    brands: [{ id: "voltix", name: "Voltix" }],
+    category: { slug: "chargers", title: "Chargers" },
+    key_features: ["30W", "USB-C PD"],
+    structured_attributes: { wattage: "30W", connector: "USB-C", ports: 1 },
+    offers: [offer("amazon.com", 15.99), offer("walmart.com", 14.97), offer("target.com", 16.99)],
+  },
+  {
+    id: "fx-chg-apple-70",
+    title: "Apple 70W USB-C Power Adapter",
+    description: "Apple's 70W USB-C adapter for MacBook Air and MacBook Pro.",
+    brands: [{ id: "apple", name: "Apple" }],
+    category: { slug: "chargers", title: "Chargers" },
+    key_features: ["70W", "USB-C"],
+    structured_attributes: { wattage: "70W", connector: "USB-C", ports: 1 },
+    offers: [offer("apple.com", 59.0), offer("bestbuy.com", 59.0), offer("amazon.com", 57.99)],
+  },
+  {
+    id: "fx-hp-sony-xm5",
+    title: "Sony WH-1000XM5 Wireless Noise Canceling Headphones, Black",
+    description: "Industry-leading noise canceling with 30-hour battery life.",
+    brands: [{ id: "sony", name: "Sony" }],
+    category: { slug: "headphones", title: "Headphones" },
+    key_features: ["Noise canceling", "30-hour battery", "Bluetooth 5.2", "Over-ear"],
+    structured_attributes: { type: "over-ear", noise_canceling: "yes", color: "black" },
+    offers: [offer("amazon.com", 328.0), offer("bestbuy.com", 329.99), offer("target.com", 329.99), offer("walmart.com", 318.0), offer("sony.com", 349.99)],
+  },
+  {
+    id: "fx-hp-soundcore-q30",
+    title: "Soundcore by Anker Life Q30 Hybrid Active Noise Cancelling Headphones",
+    description: "Hybrid ANC over-ear headphones with 40-hour playtime.",
+    brands: [{ id: "soundcore", name: "Soundcore" }],
+    category: { slug: "headphones", title: "Headphones" },
+    key_features: ["Noise cancelling", "40-hour playtime", "Over-ear"],
+    structured_attributes: { type: "over-ear", noise_canceling: "yes", color: "black" },
+    offers: [offer("amazon.com", 69.99), offer("walmart.com", 64.99), offer("soundcore.com", 79.99), offer("target.com", 72.99)],
+  },
+  {
+    id: "fx-hp-generic-wired",
+    title: "Wired Over-Ear Studio Headphones, 3.5mm",
+    description: "Closed-back wired headphones. No active noise cancelling.",
+    brands: [{ id: "audiomax", name: "AudioMax" }],
+    category: { slug: "headphones", title: "Headphones" },
+    key_features: ["Wired", "Closed-back"],
+    structured_attributes: { type: "over-ear", noise_canceling: "no", color: "black" },
+    offers: [offer("amazon.com", 24.99), offer("walmart.com", 22.49)],
+  },
+  {
+    id: "fx-ink-hp-67xl",
+    title: "HP 67XL Black High-yield Ink Cartridge",
+    description: "Genuine HP 67XL black ink, about 240 pages.",
+    brands: [{ id: "hp", name: "HP" }],
+    category: { slug: "printer-ink", title: "Printer Ink" },
+    key_features: ["HP 67XL", "Black", "High yield", "Genuine HP"],
+    structured_attributes: { model: "67XL", color: "black" },
+    offers: [offer("amazon.com", 29.89), offer("staples.com", 32.99), offer("hp.com", 31.99), offer("officedepot.com", 32.49), offer("walmart.com", 29.88)],
+  },
+  {
+    id: "fx-ink-hp-67-tri",
+    title: "HP 67 Tri-color Ink Cartridge",
+    description: "Genuine HP 67 tri-color ink.",
+    brands: [{ id: "hp", name: "HP" }],
+    category: { slug: "printer-ink", title: "Printer Ink" },
+    key_features: ["HP 67", "Tri-color", "Genuine HP"],
+    structured_attributes: { model: "67", color: "tri-color" },
+    offers: [offer("amazon.com", 19.89), offer("staples.com", 21.99), offer("hp.com", 20.99)],
+  },
+];

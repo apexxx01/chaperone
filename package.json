@@ -1,0 +1,24 @@
+{
+  "name": "chaperone",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Purchase protection for AI shopping agents, built on PayPal. Agents can shop; nothing moves until it's right.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "demo": "npm run demo -w server",
+    "redteam": "npm run redteam -w server"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
