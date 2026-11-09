@@ -82,11 +82,13 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
         const amount = Math.round(l.price * intent.quantity * 100) / 100;
         const auth = await deps.paypal.authorize({ requestId: `naive-${intent.id}`, amount, currency: "USD", items: [{ name: l.title, quantity: intent.quantity, unitAmount: l.price }], description: `UNPROTECTED ${l.merchant.domain}`, customId: `naive_${intent.id}`, invoiceId: `NAIVE-${intent.id}` });
         const cap = await deps.paypal.capture(auth.authorizationId, { requestId: `naive-cap-${intent.id}`, amount, final: true, invoiceId: `NAIVE-${intent.id}` });
+        (run.buys ??= []).push({ listingId: l.id, quantity: intent.quantity, amount, outcome: "paid" });
         step("tool", `PAID $${amount.toFixed(2)} to ${l.merchant.payoutEmail} immediately (capture ${cap.captureId}). No checks.`, "buy");
         return { status: "PAID", amount, capture_id: cap.captureId };
       }
       const p = await deps.chaperone.propose(intent);
       run.purchaseIds.push(p.id);
+      (run.buys ??= []).push({ listingId: l.id, quantity: intent.quantity, amount: p.amount.value, outcome: p.state });
       step("chaperone", p.verdict.headline, "buy");
       return { status: p.state.toUpperCase(), message: p.verdict.headline };
     },

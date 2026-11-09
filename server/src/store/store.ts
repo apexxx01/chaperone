@@ -18,6 +18,8 @@ export interface AgentRun {
   finishedAt?: string;
   steps: AgentStep[];
   purchaseIds: string[];
+  /** What the agent actually tried to buy (both modes). */
+  buys?: { listingId: string; quantity: number; amount: number; outcome: string }[];
   status: "running" | "done" | "error";
   error?: string;
 }

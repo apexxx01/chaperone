@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "demo": "CHAPERONE_MODE=offline tsx src/index.ts",
-    "redteam": "tsx --env-file-if-exists=../.env src/redteam/cli.ts"
+    "redteam": "tsx --env-file-if-exists=../.env src/redteam/cli.ts",
+    "hijack": "tsx --env-file-if-exists=../.env src/redteam/hijack.ts"
   },
   "dependencies": {
     "@google/genai": "^3.0.0",
