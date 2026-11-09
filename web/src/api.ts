@@ -1,0 +1,126 @@
+import { useEffect, useRef, useState } from "react";
+import type { Mandate, Purchase } from "../../server/src/domain/types.ts";
+import type { AgentRun } from "../../server/src/store/store.ts";
+import type { CaseResult, RedteamReport } from "../../server/src/redteam/runner.ts";
+
+export type { Mandate, Purchase, AgentRun, CaseResult, RedteamReport };
+export type { Check, PurchaseState } from "../../server/src/domain/types.ts";
+
+export interface Capabilities {
+  mode: "live" | "offline";
+  paypal: boolean;
+  gemini: boolean;
+  channel3: boolean;
+  paypalEnv: string;
+  paymentMode: string;
+  paypalClient: "sandbox" | "simulated";
+}
+
+export interface AppState {
+  capabilities: Capabilities;
+  mandates: Mandate[];
+  purchases: Purchase[];
+  runs: AgentRun[];
+  redteam: RedteamReport | null;
+  attacks: { id: string; name: string; technique: string; task: string; goal: string }[];
+  tasks: { id: string; instruction: string }[];
+  sellers: number;
+}
+
+export class ApiError extends Error {}
+
+export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(json.error ?? `Request failed (${res.status})`);
+  return json as T;
+}
+
+/** Full state on load, then live patches over SSE. Reconnects with backoff and resyncs on reconnect. */
+export function useLive() {
+  const [state, setState] = useState<AppState | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [liveCases, setLiveCases] = useState<CaseResult[]>([]);
+  const [redteamRunning, setRedteamRunning] = useState(false);
+  const retry = useRef(0);
+
+  const refresh = async () => {
+    try {
+      setState(await api<AppState>("GET", "/api/state"));
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let timer: number | undefined;
+    let closed = false;
+    const connect = () => {
+      es = new EventSource("/api/events");
+      es.addEventListener("hello", () => {
+        retry.current = 0;
+        setConnected(true);
+        void refresh();
+      });
+      const patch = (fn: (s: AppState, d: any) => AppState) => (ev: MessageEvent) => {
+        const d = JSON.parse(ev.data);
+        setState((s) => (s ? fn(s, d) : s));
+      };
+      es.addEventListener("purchase", patch((s, d) => ({ ...s, purchases: upsert(s.purchases, d.payload, (p) => p.intent.createdAt) })));
+      es.addEventListener("mandate", patch((s, d) => ({ ...s, mandates: upsert(s.mandates, d.payload, (m) => m.createdAt) })));
+      es.addEventListener("agent", patch((s, d) => ({ ...s, runs: upsert(s.runs, d.payload, (r) => r.startedAt) })));
+      es.addEventListener("reset", () => void refresh());
+      es.addEventListener("redteam", (ev: MessageEvent) => {
+        const d = JSON.parse(ev.data).payload;
+        if (d.case) {
+          setRedteamRunning(true);
+          setLiveCases((cs) => [...cs.filter((c) => c.id !== d.case.id), d.case]);
+        }
+        if (d.report) {
+          setRedteamRunning(false);
+          setLiveCases([]);
+          setState((s) => (s ? { ...s, redteam: d.report } : s));
+        }
+        if (d.error) {
+          setRedteamRunning(false);
+          setError(d.error);
+        }
+      });
+      es.onerror = () => {
+        setConnected(false);
+        es?.close();
+        if (closed) return;
+        const wait = Math.min(15000, 500 * 2 ** retry.current++);
+        timer = window.setTimeout(connect, wait);
+      };
+    };
+    void refresh();
+    connect();
+    return () => {
+      closed = true;
+      es?.close();
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return { state, connected, error, refresh, liveCases, redteamRunning, setRedteamRunning, setLiveCases };
+}
+
+function upsert<T extends { id: string }>(list: T[], item: T, sortKey: (x: T) => string): T[] {
+  const next = list.filter((x) => x.id !== item.id);
+  next.push(item);
+  return next.sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+}
+
+export const usd = (n: number) => `$${n.toFixed(2)}`;
+export const ago = (iso: string) => {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${Math.round(s)}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return new Date(iso).toLocaleDateString();
+};
+export const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
