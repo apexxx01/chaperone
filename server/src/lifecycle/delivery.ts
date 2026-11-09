@@ -6,7 +6,7 @@
 import { config } from "../config.ts";
 import type { Check, DeliveryReport, Mandate, Purchase, Verdict } from "../domain/types.ts";
 import { generateJson } from "../agent/gemini.ts";
-import { satisfies, round2 } from "../gate/policy.ts";
+import { meetsSpec, round2 } from "../gate/policy.ts";
 import { sanitize, scanText } from "../gate/scanner.ts";
 
 export type Settlement =
@@ -39,7 +39,7 @@ export function titleSimilarity(a: string, b: string): number {
 async function judge(ordered: string, delivered: string, mustHave: string[]): Promise<{ j: ManifestJudgement; source: string }> {
   if (config.mode === "offline" || !config.geminiKey) {
     const sim = titleSimilarity(ordered, delivered);
-    return { j: { sameProduct: sim >= 0.7, sameBrand: sim >= 0.5, meetsRequirements: mustHave.every((r) => satisfies(r, delivered)) }, source: "heuristic" };
+    return { j: { sameProduct: sim >= 0.7, sameBrand: sim >= 0.5, meetsRequirements: mustHave.every((r) => meetsSpec(r, delivered)) }, source: "heuristic" };
   }
   const j = await generateJson<ManifestJudgement>({
     model: config.auditorModel,
@@ -67,7 +67,7 @@ export async function verifyDelivery(mandate: Mandate, p: Purchase, d: DeliveryR
   const tj = performance.now();
   const { j, source } = await judge(`${ordered.title} ${Object.entries(ordered.attributes ?? {}).map(([k, v]) => `${k} ${v}`).join(" ")}`, deliveredText, mandate.item.mustHave);
   const jms = Math.round(performance.now() - tj);
-  const reqOk = mandate.item.mustHave.every((r) => satisfies(r, deliveredText));
+  const reqOk = mandate.item.mustHave.every((r) => d.manifest.some((m) => meetsSpec(r, m.title, m.attributes ?? {})));
 
   checks.push({
     stage: "delivery",

@@ -24,6 +24,16 @@ describe("requirements matching", () => {
     expect(meetsSpec("65W", "65W-Compatible charger", { wattage: "30W" })).toBe(false);
     expect(meetsSpec("65W", "Charger", { wattage: "65W" })).toBe(true);
   });
+  it("regression: a 'noise_canceling: no' attribute does not satisfy 'noise cancel'", () => {
+    // Found by dogfooding the seeded demo: wired headphones were authorized for a noise-cancelling mandate.
+    expect(meetsSpec("noise cancel", "Wired Over-Ear Studio Headphones, 3.5mm", { type: "over-ear", noise_canceling: "no" })).toBe(false);
+    expect(meetsSpec("noise cancel", "Hybrid Active Noise Cancelling Headphones", { noise_canceling: "yes" })).toBe(true);
+  });
+  it("ignores negated mentions in copy", () => {
+    expect(meetsSpec("noise cancel", "Closed-back headphones. No active noise cancelling.")).toBe(false);
+    expect(meetsSpec("USB-C", "Charger with non-USB-C barrel plug")).toBe(false);
+    expect(meetsSpec("USB-C", "2x USB-C ports")).toBe(true);
+  });
   it("rejects 'compatible' and 'up to' qualifiers", () => {
     expect(meetsSpec("65W", "Charger 65W-compatible")).toBe(false);
     expect(meetsSpec("65W", "supports up to 65W laptops")).toBe(false);

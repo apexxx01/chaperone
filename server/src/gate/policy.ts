@@ -51,8 +51,29 @@ export function meetsSpec(requirement: string, title: string, attributes: Record
     const t = title.toLowerCase().replace(/watts?/g, "w");
     const qualified = new RegExp(`(up to|for|supports?)\\s*${num[1]}\\s*${unit}|${num[1]}\\s*${unit}[-\\s]*(compatible|ready|equivalent|replacement)`, "i").test(t);
     if (qualified) return false;
+    return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | "));
   }
-  return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | "));
+
+  // Feature specs ("noise cancel", "USB-C"): a structured attribute that names the
+  // feature and says no ("noise_canceling: no") is a hard miss, whatever the copy says.
+  const req = normalizeReq(requirement);
+  for (const [k, v] of Object.entries(attributes)) {
+    const key = normalizeReq(k);
+    if ((key.includes(req) || req.includes(key)) && NEGATIVE.test(v.trim())) return false;
+  }
+  // Text mentions only count when they aren't negated ("No active noise cancelling", "non-USB-C").
+  const text = [title, ...Object.entries(attributes).map(([k, v]) => (NEGATIVE.test(v.trim()) ? "" : `${k} ${v}`))].join(" | ");
+  return positiveMention(requirement, text);
+}
+
+const NEGATIVE = /^(no|none|false|n|0|not included|without|n\/a)$/i;
+
+function positiveMention(requirement: string, text: string): boolean {
+  const words = requirement.toLowerCase().split(/[\s\-_]+/).filter(Boolean);
+  const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\-_]*");
+  const re = new RegExp(`(\\b(no|not|non|without|lacks?|zero)\\b[\\s\\-]*(\\w+[\\s\\-]+){0,2})?${pattern}`, "gi");
+  for (const m of text.matchAll(re)) if (!m[1]) return true;
+  return false;
 }
 
 /** True when a requirement like "65W" or "USB-C" is satisfied by the product text. */
