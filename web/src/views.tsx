@@ -11,7 +11,9 @@ const PRESETS = [
 ];
 
 // ── Now ──────────────────────────────────────────────────────
-export function NowView({ s, open, openId, notify, goto }: { s: AppState; open: (id: string) => void; openId?: string; notify: Notify; goto: (t: string) => void }) {
+export function NowView({ s: all, open, openId, notify, goto }: { s: AppState; open: (id: string) => void; openId?: string; notify: Notify; goto: (t: string) => void }) {
+  // This view is your own agent's purchases; Arena duels and red-team runs live in their own tabs.
+  const s = { ...all, purchases: all.purchases.filter((p) => !/^md_(arena|rt)_/.test(p.intent.mandateId)), runs: all.runs.filter((r) => !/^md_(arena|rt)_/.test(r.mandateId)) };
   const held = s.purchases.filter((p) => p.state === "held");
   const holding = s.purchases.filter((p) => p.state === "awaiting_delivery" || p.state === "verifying");
   const heldSum = holding.reduce((a, p) => a + p.amount.value, 0);
@@ -303,7 +305,7 @@ export function RedTeamView({ s, live, running, start }: { s: AppState; live: Ca
   const by = (o: string) => attacks.filter((c) => c.protected.outcome === o).length;
   return (
     <>
-      <h1 className="headline">Same hijacked agent. Different outcome.</h1>
+      <h2 className="subhead">Same hijacked agent, different outcome.</h2>
       <p className="lede">
         Pickpocket runs {s.attacks.length} attacks in the style of published research: hidden instructions, invisible Unicode, fake system messages, lookalike stores, swapped payees, bait-and-switch, fake delivery claims. We assume the agent falls for every one, then check where the money goes.
       </p>

@@ -3,12 +3,13 @@ import { api, useLive } from "./api.ts";
 import { Drawer, Logo } from "./components.tsx";
 import { HowView, MandatesView, NowView, RedTeamView } from "./views.tsx";
 import { ArenaView } from "./arena.tsx";
+import { EvidenceView, Ticker } from "./evidence.tsx";
 
 const TABS = [
   { id: "arena", label: "Arena", key: "1" },
   { id: "now", label: "Your agent", key: "2" },
-  { id: "mandates", label: "Mandates", key: "3" },
-  { id: "redteam", label: "Red team", key: "4" },
+  { id: "redteam", label: "Evidence", key: "3" },
+  { id: "mandates", label: "Mandates", key: "4" },
   { id: "how", label: "How it works", key: "5" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -150,18 +151,20 @@ export function App() {
           <span className={`wire ${caps.gemini ? "live" : "sim"}`}><i />{caps.gemini ? "Gemini" : "Offline AI"}</span>
           <span className={`wire ${caps.channel3 ? "live" : "sim"}`}><i />{caps.channel3 ? "Channel3" : "Offline catalog"}</span>
           {!connected && <span className="wire"><i />Reconnecting</span>}
-          <button className="icon-btn" onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "" : "dark")} aria-label="Switch theme">{theme === "dark" ? "Dark" : theme === "light" ? "Light" : "Auto"}</button>
+          <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "" : "light")} aria-label="Switch theme">{theme === "light" ? "White" : "Black"}</button>
           <button className="icon-btn" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts">?</button>
         </div>
       </header>
 
       {caps.mode === "offline" && <div className="banner">Offline demo: payments go to a PayPal simulator with the same rules, and the AI runs on local heuristics. Add sandbox keys to run it for real.</div>}
 
+      <Ticker purchases={state.purchases} />
+
       <main>
         {tab === "arena" && <ArenaView s={state} notify={notify} open={setOpenId} />}
         {tab === "now" && <NowView s={state} open={setOpenId} openId={openId} notify={notify} goto={(t) => setTab(t as Tab)} />}
         {tab === "mandates" && <MandatesView s={state} notify={notify} />}
-        {tab === "redteam" && <RedTeamView s={state} live={liveCases} running={redteamRunning} start={startRedteam} />}
+        {tab === "redteam" && <EvidenceView s={state}><RedTeamView s={state} live={liveCases} running={redteamRunning} start={startRedteam} /></EvidenceView>}
         {tab === "how" && <HowView s={state} />}
       </main>
 

@@ -43,14 +43,21 @@ export class Store {
   private file?: string;
   private timer?: NodeJS.Timeout;
 
-  constructor(dir?: string) {
+  /** True when this store started from the recorded runs shipped in the repo rather than its own data. */
+  seeded = false;
+
+  constructor(dir?: string, seedFile?: string) {
     this.events.setMaxListeners(200);
     if (!dir) return;
     mkdirSync(dir, { recursive: true });
     this.file = join(dir, "chaperone.json");
-    if (existsSync(this.file)) {
+    // A fresh instance (the free host wipes its disk on every deploy) starts from real runs recorded
+    // against the PayPal sandbox, so the console is never empty. New runs are added on top.
+    const source = existsSync(this.file) ? this.file : seedFile && existsSync(seedFile) ? seedFile : null;
+    this.seeded = !!source && source !== this.file;
+    if (source) {
       try {
-        const s = JSON.parse(readFileSync(this.file, "utf8")) as Snapshot;
+        const s = JSON.parse(readFileSync(source, "utf8")) as Snapshot;
         s.mandates?.forEach((m) => this.mandates.set(m.id, m));
         s.purchases?.forEach((p) => this.purchases.set(p.id, p));
         s.runs?.forEach((r) => this.runs.set(r.id, r));

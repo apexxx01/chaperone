@@ -10,6 +10,8 @@ export interface GateDeps {
   now?: () => Date;
 }
 
+const NO_FLAGS = { addressesAI: false, claimsApproval: false, requestsDifferentPayee: false, pushesQuantity: false, pressureTactics: false, asksToHideFromHuman: false, contradictsListingPrice: false };
+
 const SCAN_WEIGHT = { high: 35, medium: 15, low: 4 } as const;
 
 export function scanIntent(intent: PurchaseIntent): Finding[] {
@@ -75,12 +77,15 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
   const findings = scanIntent(intent);
   const scan = scannerChecks(findings);
 
-  // AI layer: quarantined reader, then privileged auditor.
+  // AI layer: the quarantined reader and the privileged auditor run at the same time and never talk to each other.
+  // The auditor sees only what the deterministic layer already established.
   let ai: Check[] = [];
   try {
     const reqCheck = deterministic.find((c) => c.rule === "policy.requirements");
     const unconfirmed = reqCheck?.outcome === "warn" ? String(reqCheck.data?.unconfirmed ?? "").split(", ").filter(Boolean) : [];
-    const reader = await readUntrusted(intent, unconfirmed);
+    // Requirements the reader is still confirming aren't reported to the auditor as problems.
+    const settled = deterministic.filter((c) => !(c === reqCheck && c.outcome === "warn"));
+    const [reader, a] = await Promise.all([readUntrusted(intent, unconfirmed), audit({ mandate, intent, market, deterministic: settled, flags: NO_FLAGS, findings })]);
     if (reqCheck && unconfirmed.length) {
       const still = unconfirmed.filter((_, i) => !reader.confirmed[i]);
       // A page that is trying to steer the agent doesn't get to vouch for itself.
@@ -97,7 +102,6 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
       reqCheck.data = { ...reqCheck.data, confirmedByReader: unconfirmed.filter((_, i) => reader.confirmed[i]).join(", ") };
     }
     const readerCheck = flagsToChecks(reader.flags, reader.source, reader.ms);
-    const a = await audit({ mandate, intent, market, deterministic, flags: reader.flags, findings });
     ai = [
       readerCheck,
       {

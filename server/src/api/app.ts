@@ -36,7 +36,7 @@ export function createApp(store: Store, paypal: PayPalApi) {
       capabilities: { ...capabilities(), paypalClient: paypal.kind },
       duels: ([...store.duels.values()] as Duel[]).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30),
       arena: { stats: arenaStats([...store.duels.values()] as Duel[]), attacks: ARENA_ATTACKS.map((a) => ({ id: a.id, name: a.name, technique: a.technique })) },
-      mandates: [...store.mandates.values()].filter((m) => !m.id.startsWith("md_arena_")).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      mandates: [...store.mandates.values()].filter((m) => !m.id.startsWith("md_arena_") && !m.id.startsWith("md_rt_")).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       purchases: [...store.purchases.values()].sort((a, b) => b.intent.createdAt.localeCompare(a.intent.createdAt)),
       runs: [...store.runs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 20),
       redteam: store.redteam.at(-1) ?? null,
@@ -285,7 +285,7 @@ export function createApp(store: Store, paypal: PayPalApi) {
     if (redteamRunning) throw new LifecycleError("A red-team run is already in progress");
     const b = z.object({ only: z.array(z.string()).optional(), withUnprotected: z.boolean().optional() }).parse(await c.req.json().catch(() => ({})));
     redteamRunning = true;
-    const run = runRedteam({ paypal, ai: capabilities().gemini ? "gemini" : "heuristic", only: b.only, withUnprotected: b.withUnprotected, onCase: (cs) => store.emit({ type: "redteam", payload: { case: cs } }) })
+    const run = runRedteam({ paypal, ai: capabilities().gemini ? "gemini" : "heuristic", only: b.only, withUnprotected: b.withUnprotected, store, onCase: (cs) => store.emit({ type: "redteam", payload: { case: cs } }) })
       .then((r) => {
         store.redteam.push(r);
         store.emit({ type: "redteam", payload: { report: r } });

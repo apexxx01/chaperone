@@ -15,6 +15,8 @@ export const config = {
   },
   geminiKey: env.GEMINI_API_KEY ?? "",
   geminiModel: env.GEMINI_MODEL ?? "gemini-3.6-flash",
+  /** The quarantined reader answers yes/no flags, so it runs on a small, fast model. */
+  readerModel: env.GEMINI_READER_MODEL ?? "gemini-3.1-flash-lite",
   auditorModel: env.GEMINI_AUDITOR_MODEL ?? env.GEMINI_MODEL ?? "gemini-3.6-flash",
   channel3Key: env.CHANNEL3_API_KEY ?? "",
   dataDir: env.CHAPERONE_DATA_DIR ?? new URL("../data/", import.meta.url).pathname,

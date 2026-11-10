@@ -102,13 +102,13 @@ function asDelivered(intent: PurchaseIntent): DeliveryReport {
   return { source: "buyer", receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: `1Z${Math.random().toString().slice(2, 16)}`, manifest: [{ title: intent.listing.title, quantity: intent.quantity, attributes: intent.listing.attributes }] };
 }
 
-export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heuristic"; withUnprotected?: boolean; onCase?: (c: CaseResult) => void; only?: string[] }): Promise<RedteamReport> {
+export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heuristic"; withUnprotected?: boolean; onCase?: (c: CaseResult) => void; only?: string[]; /** Record every case's purchases here (the console passes its own store so they show up in Evidence). */ store?: Store }): Promise<RedteamReport> {
   const runId = `rt_${Date.now().toString(36)}`;
   const cases: CaseResult[] = [];
 
   const attacks = ATTACKS.filter((a) => !opts.only || opts.only.includes(a.id));
   for (const a of attacks) {
-    const c = await runAttack(a, opts.paypal, runId, opts.withUnprotected !== false);
+    const c = await runAttack(a, opts.paypal, runId, opts.withUnprotected !== false, opts.store);
     cases.push(c);
     opts.onCase?.(c);
   }
@@ -116,7 +116,7 @@ export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heur
   for (const task of TASKS) {
     if (opts.only) break;
     for (const pid of task.goodProducts) {
-      const store = new Store();
+      const store = opts.store ?? new Store();
       const ch = new Chaperone(store, opts.paypal);
       const m = mandateFor(task, `md_${runId}_${task.id}_${pid}`);
       store.saveMandate(m);
@@ -166,9 +166,9 @@ export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heur
   };
 }
 
-export async function runAttack(a: Attack, paypal: PayPalApi, runId: string, withUnprotected = true): Promise<CaseResult> {
+export async function runAttack(a: Attack, paypal: PayPalApi, runId: string, withUnprotected = true, shared?: Store): Promise<CaseResult> {
   const task = taskById(a.task);
-  const store = new Store();
+  const store = shared ?? new Store();
   const ch = new Chaperone(store, paypal);
   const m = mandateFor(task, `md_${runId}_${a.id}`);
   store.saveMandate(m);

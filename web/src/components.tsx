@@ -185,6 +185,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
           </ol>
         </section>
 
+        <ChainBadge p={p} />
+
         <section className="section" style={{ marginTop: 24 }}>
           <h3 style={{ marginBottom: 10 }}>PayPal receipts</h3>
           <dl className="ids">
@@ -206,6 +208,42 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
         </section>
       </aside>
     </>
+  );
+}
+
+const GENESIS = "chaperone:v1";
+async function sha(s: string) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+/** Re-computes the purchase's hash chain here in the browser, so the server's word isn't taken for it. */
+export async function verifyChain(p: Purchase): Promise<{ ok: boolean; head: string; brokenAt?: number }> {
+  let prev = await sha(`${GENESIS}\n${p.intent.createdAt}\ngenesis\n${p.id}\n${p.intent.id}`);
+  for (let i = 0; i < p.timeline.length; i++) {
+    const e = p.timeline[i]!;
+    const want = await sha(`${prev}\n${e.at}\n${e.kind}\n${e.label}\n${e.detail ?? ""}`);
+    if (e.hash !== want) return { ok: false, head: e.hash ?? "", brokenAt: i };
+    prev = want;
+  }
+  return { ok: true, head: prev };
+}
+
+function ChainBadge({ p }: { p: Purchase }) {
+  const [v, setV] = useState<{ ok: boolean; head: string; brokenAt?: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    setV(null);
+    if (!crypto?.subtle) return;
+    void verifyChain(p).then((r) => live && setV(r));
+    return () => { live = false; };
+  }, [p.id, p.timeline.length]);
+  if (!v) return null;
+  return (
+    <div className={`chain ${v.ok ? "ok" : "bad"}`}>
+      <b>{v.ok ? "Receipt verified in your browser" : `Receipt chain broken at event ${(v.brokenAt ?? 0) + 1}`}</b>
+      <span className="num">{v.ok ? `${p.timeline.length} events, each SHA-256 chained to the one before. Head ${v.head.slice(0, 16)}…` : "An event in this purchase's history was changed after it was written."}</span>
+      <a href={`/api/purchases/${p.id}/receipt`} target="_blank" rel="noreferrer">Download the signed-chain receipt (JSON)</a>
+    </div>
   );
 }
 
@@ -244,9 +282,9 @@ export function reveal(s: string): string {
 export function Logo() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden>
-      <rect width="64" height="64" rx="16" fill="var(--vault)" />
-      <path d="M20 22h24v6H26v8h18v6H20z" fill="var(--paper)" />
-      <circle cx="44" cy="44" r="7" fill="var(--brass)" />
+      <rect width="64" height="64" fill="var(--ink)" />
+      <path d="M14 14h36v8H22v20h28v8H14z" fill="var(--paper)" />
+      <rect x="38" y="27" width="12" height="10" fill="var(--signal)" />
     </svg>
   );
 }

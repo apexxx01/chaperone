@@ -6,7 +6,7 @@ import { createApp } from "./api/app.ts";
 import { makePayPal } from "./paypal/index.ts";
 import { Store } from "./store/store.ts";
 
-const store = new Store(config.dataDir);
+const store = new Store(config.dataDir, config.mode === "live" ? new URL("../seed/snapshot.json", import.meta.url).pathname : undefined);
 const paypal = makePayPal();
 const { app } = createApp(store, paypal);
 

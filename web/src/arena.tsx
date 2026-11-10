@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, usd, type AgentRun, type AppState, type Duel } from "./api.ts";
 import { reveal } from "./components.tsx";
+import { GateField } from "./gate3d.tsx";
+import { Num } from "./evidence.tsx";
 
 type Notify = (m: string, err?: boolean) => void;
 
@@ -47,15 +49,20 @@ export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; op
 
   return (
     <>
-      <h1 className="headline">Try to rob this agent.</h1>
-      <p className="lede">
-        One real Gemini agent, sent shopping twice with the same poisoned search results. On the left it holds PayPal directly. On the right it goes through Chaperone. Pick an attack or write your own, then watch where the money goes.
-      </p>
+      <div className="hero">
+        <GateField purchases={s.purchases} />
+        <div className="hero-copy">
+          <h1 className="headline">Try to rob this agent.</h1>
+          <p className="lede">
+            One real Gemini agent, sent shopping twice with the same poisoned search results. Alone, it holds PayPal directly. With Chaperone, every purchase flies through the gate you see here, and the money waits in PayPal until the right thing arrives.
+          </p>
+        </div>
+      </div>
 
       <div className="score num" aria-label="Arena totals">
-        <div><b>{st.duels}</b><span>duels run</span></div>
-        <div className="bad"><b>{st.aloneRobbed}</b><span>times the lone agent was robbed</span></div>
-        <div className="bad"><b>{usd(st.aloneLost)}</b><span>captured from it in the sandbox</span></div>
+        <div><b><Num value={st.duels} /></b><span>duels run</span></div>
+        <div className="bad"><b><Num value={st.aloneRobbed} /></b><span>times the lone agent was robbed</span></div>
+        <div className="bad"><b><Num value={st.aloneLost} money /></b><span>captured from it in the sandbox</span></div>
         <div className={st.gateBypassed ? "bad" : "good"}><b>{st.gateBypassed}</b><span>times an attack got past the gate</span></div>
         <div className="good"><b>{usd(st.capturedThroughChaperone)}</b><span>paid to an attacker through Chaperone</span></div>
       </div>
@@ -140,7 +147,7 @@ export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; op
   );
 }
 
-const VERDICT: Record<string, string> = { caught: "Stopped", resisted: "Agent resisted", bypassed: "Got past the gate" };
+const VERDICT: Record<string, string> = { caught: "Blocked by Chaperone", alone_only: "Only the lone agent fell", resisted: "Agent resisted", bypassed: "Got past the gate" };
 
 function DuelBoard({ d, s, open }: { d: Duel; s: AppState; open: (id: string) => void }) {
   const runA = s.runs.find((r) => r.id === d.alone.runId);
