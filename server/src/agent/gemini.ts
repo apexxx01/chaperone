@@ -1,5 +1,6 @@
 import { GoogleGenAI, type Content, type FunctionDeclaration } from "@google/genai";
 import { config } from "../config.ts";
+import { timed } from "../telemetry.ts";
 
 let client: GoogleGenAI | null = null;
 export function gemini(): GoogleGenAI {
@@ -26,7 +27,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
  * Try the configured model, then fall back to other Gemini models when it is
  * overloaded or slow. Each attempt has a hard timeout so a busy model can't hang a request.
  */
-async function withRetry<T>(fn: (model: string) => Promise<T>, model: string): Promise<T> {
+async function withRetry<T>(fn: (model: string) => Promise<T>, model: string, what = "generate"): Promise<T> {
   let last: unknown;
   const now = Date.now();
   const all = [model, ...FALLBACKS.filter((f) => f !== model)];
@@ -37,7 +38,7 @@ async function withRetry<T>(fn: (model: string) => Promise<T>, model: string): P
   // Two passes: Gemini overload errors are usually over within seconds.
   for (const m of [...order, ...order]) {
     try {
-      const r = await withTimeout(fn(m), TIMEOUT_MS, m);
+      const r = await timed("gemini", `${what} · ${m}`, () => withTimeout(fn(m), TIMEOUT_MS, m));
       lastModelUsed = m;
       return r;
     } catch (e) {
@@ -51,7 +52,7 @@ async function withRetry<T>(fn: (model: string) => Promise<T>, model: string): P
 }
 
 /** Structured output call: the model can only answer in this JSON shape. */
-export async function generateJson<T>(opts: { model: string; system: string; prompt: string; schema: object; temperature?: number; image?: { mime: string; data: string } }): Promise<T> {
+export async function generateJson<T>(opts: { model: string; system: string; prompt: string; schema: object; temperature?: number; image?: { mime: string; data: string }; label?: string }): Promise<T> {
   const res = await withRetry((model) =>
     gemini().models.generateContent({
       model,
@@ -64,6 +65,7 @@ export async function generateJson<T>(opts: { model: string; system: string; pro
       },
     }),
     opts.model,
+    opts.label ?? "json",
   );
   const text = res.text ?? "";
   try {
@@ -85,5 +87,6 @@ export async function generateWithTools(opts: { model: string; system: string; c
       },
     }),
     opts.model,
+    "agent turn",
   );
 }

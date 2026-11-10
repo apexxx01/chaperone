@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, clock, usd, type Check, type Purchase } from "./api.ts";
 
@@ -112,8 +113,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
   const l = p.intent.listing;
   return (
     <>
-      <div className="drawer-back" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <motion.div className="drawer-back" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+      <motion.aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
         <div className="drawer-head">
           <div>
             <span className={`state ${p.state}`}>{coinFor(p).label}</span>
@@ -206,7 +207,7 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
           <pre style={{ whiteSpace: "pre-wrap", font: "13px/1.5 var(--text)", background: "var(--surface)", padding: 12, borderRadius: 10, margin: 0, maxHeight: 220, overflow: "auto", overflowWrap: "anywhere" }}>{reveal(l.pageText)}</pre>
           <p className="faint" style={{ fontSize: 13 }}>Agent's reason: {p.intent.agentRationale}</p>
         </section>
-      </aside>
+      </motion.aside>
     </>
   );
 }

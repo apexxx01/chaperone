@@ -1,3 +1,5 @@
+import { Pipeline } from "./pipeline.tsx";
+import { Pane } from "./ui.tsx";
 import { useMemo, useState } from "react";
 import { api, ago, usd, type AppState, type CaseResult, type Mandate, type Purchase } from "./api.ts";
 import { Lane } from "./components.tsx";
@@ -368,30 +370,9 @@ export function HowView({ s }: { s: AppState }) {
     <>
       <h1 className="headline">The money waits until it's right.</h1>
       <p className="lede">Agents get fooled. StakeBench (2026) hijacked GPT-5 and Gemini web agents with hidden page text 42–68% of the time. Chaperone doesn't try to make the agent smarter. It makes sure a fooled agent can't move money.</p>
-      <svg className="flow" viewBox="0 0 960 250" role="img" aria-label="Flow: agent proposes, gate checks, PayPal authorizes and holds funds, delivery is verified, then capture and seller payout, or void.">
-        <defs>
-          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)" /></marker>
-        </defs>
-        {[
-          { x: 10, t: "Agent proposes", d: "reads untrusted pages" },
-          { x: 200, t: "Gate", d: "policy · market · scanner · AI" },
-          { x: 390, t: "PayPal authorize", d: "funds held, not moved" },
-          { x: 580, t: "Delivery check", d: "what arrived vs. asked" },
-          { x: 770, t: "Capture + payout", d: "seller paid via Payouts" },
-        ].map((b, i) => (
-          <g key={b.t}>
-            <rect x={b.x} y={60} width={170} height={74} rx={14} fill={i === 2 ? "var(--brass-soft)" : "var(--surface)"} stroke={i === 2 ? "var(--brass)" : "var(--line)"} />
-            <text x={b.x + 16} y={92} fontSize="16" fontWeight="600">{b.t}</text>
-            <text x={b.x + 16} y={114} fontSize="13" fill="var(--ink-2)" style={{ fill: "var(--ink-2)" }}>{b.d}</text>
-            {i < 4 && <line x1={b.x + 172} y1={97} x2={b.x + 188} y2={97} stroke="var(--ink-3)" strokeWidth="2" markerEnd="url(#ar)" />}
-          </g>
-        ))}
-        <path d="M285 136 V200 H330" stroke="var(--signal)" strokeWidth="2" fill="none" markerEnd="url(#ar)" />
-        <text x={338} y={205} fontSize="14" style={{ fill: "var(--signal)" }}>block · or hold for you</text>
-        <path d="M665 136 V200 H710" stroke="var(--signal)" strokeWidth="2" fill="none" markerEnd="url(#ar)" />
-        <text x={718} y={205} fontSize="14" style={{ fill: "var(--signal)" }}>void: money never moved</text>
-        <text x={10} y={34} fontSize="13" style={{ fill: "var(--ink-3)" }}>The human signs limits once in PayPal (Vault). Everything after runs without them, unless something needs them.</text>
-      </svg>
+      <Pane title="The system, as built" hint="hover any box to see what it checks · pulses are real purchases" live className="how-map">
+        <Pipeline purchases={s.purchases} />
+      </Pane>
       <div className="cols">
         <div><h3>Code decides facts</h3><p>Caps, budget, quantity, specs, lookalike stores, payee identity and price vs. the same product's offers on Channel3 are plain code. Page text is never an input to an amount.</p></div>
         <div><h3>AI judges, quarantined</h3><p>A Gemini reader looks at the untrusted page and can only answer yes/no flags. A second Gemini auditor sees your words and the facts, never the page, so injected text has no path to it.</p></div>

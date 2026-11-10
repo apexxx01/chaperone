@@ -48,6 +48,7 @@ export async function draftMandate(instruction: string): Promise<{ draft: Mandat
   if (config.mode === "offline" || !config.geminiKey) return { draft: heuristicDraft(instruction), source: "heuristic" };
   try {
     const d = await generateJson<MandateDraft>({
+      label: "draft mandate",
       model: config.geminiModel,
       system: `Extract a purchase mandate from a user's shopping instruction. Be conservative.
 - mustHave: hard, checkable specs the user named (e.g. "65W", "USB-C", "67XL", "noise cancel"). Short tokens. No adjectives like "good".

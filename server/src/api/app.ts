@@ -11,13 +11,17 @@ import { appendEvent, verifyChain } from "../lifecycle/receipt.ts";
 import { cachedListing, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
+import { instrument } from "../paypal/instrument.ts";
+import { log as tlog, snapshot as telemetrySnapshot, telemetry, type LogLine } from "../telemetry.ts";
+import { readFileSync, existsSync as fileExists } from "node:fs";
 import { ATTACKS } from "../redteam/attacks.ts";
 import { ARENA_ATTACKS, arenaStats, customAttack, runDuel, type Duel } from "../arena/duel.ts";
 import { runRedteam } from "../redteam/runner.ts";
 import { TASKS } from "../redteam/tasks.ts";
 import type { Store, StoreEvent } from "../store/store.ts";
 
-export function createApp(store: Store, paypal: PayPalApi) {
+export function createApp(store: Store, rawPaypal: PayPalApi) {
+  const paypal = instrument(rawPaypal);
   const chaperone = new Chaperone(store, paypal);
   const app = new Hono();
 
@@ -27,6 +31,19 @@ export function createApp(store: Store, paypal: PayPalApi) {
     if (err instanceof PayPalError) return c.json({ error: explain(err), paypal: { issue: err.issue, debugId: err.debugId } }, 502);
     console.error(err);
     return c.json({ error: String(err.message ?? err) }, 500);
+  });
+
+  app.get("/api/telemetry", (c) => c.json(telemetrySnapshot()));
+
+  /** Recorded reports from the command-line runs (held-out round, hijack rate), shipped in docs/receipts. */
+  app.get("/api/receipts/:name", (c) => {
+    const name = c.req.param("name");
+    if (!/^(heldout|hijack)$/.test(name)) throw new LifecycleError("Unknown report", 404);
+    const dir = new URL("../../../docs/receipts/", import.meta.url).pathname;
+    const live = new URL("../../../repro/out/", import.meta.url).pathname + `${name}-latest.json`;
+    const file = fileExists(live) ? live : [`${dir}${name}-2026-11-10.json`].find((f) => fileExists(f));
+    if (!file) throw new LifecycleError("No report recorded yet", 404);
+    return c.json(JSON.parse(readFileSync(file, "utf8")));
   });
 
   app.get("/api/health", (c) => c.json({ ok: true, ...capabilities(), paypalClient: paypal.kind }));
@@ -51,9 +68,12 @@ export function createApp(store: Store, paypal: PayPalApi) {
       let id = 0;
       const send = (e: StoreEvent) => void stream.writeSSE({ id: String(++id), event: e.type, data: JSON.stringify(e) }).catch(() => {});
       store.events.on("event", send);
+      const sendLine = (l: LogLine) => void stream.writeSSE({ id: String(++id), event: "log", data: JSON.stringify(l) }).catch(() => {});
+      telemetry.on("line", sendLine);
       const beat = setInterval(() => void stream.writeSSE({ event: "ping", data: String(Date.now()) }).catch(() => {}), 15000);
       stream.onAbort(() => {
         store.events.off("event", send);
+        telemetry.off("line", sendLine);
         clearInterval(beat);
       });
       await stream.writeSSE({ event: "hello", data: JSON.stringify({ at: new Date().toISOString() }) });

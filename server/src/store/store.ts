@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from "
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import type { AgentStep, Mandate, Purchase } from "../domain/types.ts";
+import { recentLines, restoreLines, telemetry, type LogLine } from "../telemetry.ts";
 
 export interface StoreEvent {
   type: "purchase" | "mandate" | "agent" | "redteam" | "duel" | "reset";
@@ -30,6 +31,7 @@ interface Snapshot {
   runs: AgentRun[];
   redteam: unknown[];
   duels?: unknown[];
+  telemetry?: LogLine[];
 }
 
 /** Small, durable, boring: in-memory maps + an atomic JSON snapshot. */
@@ -49,6 +51,7 @@ export class Store {
   constructor(dir?: string, seedFile?: string) {
     this.events.setMaxListeners(200);
     if (!dir) return;
+    telemetry.on("line", () => this.persist());
     mkdirSync(dir, { recursive: true });
     this.file = join(dir, "chaperone.json");
     // A fresh instance (the free host wipes its disk on every deploy) starts from real runs recorded
@@ -63,6 +66,7 @@ export class Store {
         s.runs?.forEach((r) => this.runs.set(r.id, r));
         this.redteam = s.redteam ?? [];
         (s.duels as { id: string; at: string }[] | undefined)?.forEach((d) => this.duels.set(d.id, d));
+        if (s.telemetry) restoreLines(s.telemetry);
       } catch {
         /* corrupt snapshot: start fresh rather than crash */
       }
@@ -78,7 +82,7 @@ export class Store {
     if (!this.file) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
-      const snap: Snapshot = { mandates: [...this.mandates.values()], purchases: [...this.purchases.values()], runs: [...this.runs.values()].slice(-50), redteam: this.redteam.slice(-10), duels: [...this.duels.values()].slice(-200) };
+      const snap: Snapshot = { mandates: [...this.mandates.values()], purchases: [...this.purchases.values()], runs: [...this.runs.values()].slice(-50), redteam: this.redteam.slice(-10), duels: [...this.duels.values()].slice(-200), telemetry: recentLines() };
       const tmp = `${this.file}.tmp`;
       writeFileSync(tmp, JSON.stringify(snap));
       renameSync(tmp, this.file!);

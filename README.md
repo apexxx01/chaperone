@@ -3,7 +3,7 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-106%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-110%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
@@ -20,7 +20,7 @@ Most "agent wallet" tools stop at *should the agent buy this?* Chaperone covers 
 
 | | |
 |---|---|
-| **Live demo** | https://chaperone-ku2k.onrender.com (opens on the Arena: try to rob the agent) |
+| **Live demo** | https://chaperone-ku2k.onrender.com (opens on the control room; ⌘K jumps anywhere) |
 | **One command (no keys)** | `docker compose -f repro/compose.yaml up` → http://localhost:8787 |
 | **From source** | `npm ci && npm run build -w web && npm run demo` |
 | **Red team** | `npm run redteam` (offline) or with keys in `.env` for the PayPal sandbox |
@@ -122,6 +122,16 @@ The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 - **Proof photo** (Gemini vision, booleans only): does the buyer's photo show the ordered product, and does any visible label contradict a requirement?
 - Fail closed: if the AI layer is down, purchases wait for you.
 
+## The control room
+
+The web app is a live mirror of the backend, not a mockup of it. Every PayPal request, Gemini call, Channel3 search, gate decision and money movement is timed on the server (`server/src/telemetry.ts`, `server/src/paypal/instrument.ts`) and streamed to the browser over SSE.
+
+- **System map**: one box per layer, in the order the code runs them. Each real purchase flies through as a pulse along the exact path it took; counts and median timings come from the recorded checks.
+- **Trace**: pick any purchase and see its gate waterfall (the two Gemini calls run side by side) and its hash-chained timeline.
+- **Where the money went**: every proposed dollar, from proposal through the gate into PayPal, captured, voided or still held.
+- **Backend log** and **provider health**: the raw call log with p50/p95 and error rate per provider. Gemini quota errors show up here as they happen, and the gate fails closed on them.
+- **Command palette** (⌘K or `/`): jump to a view, run any duel, open any purchase.
+
 ## Repo map
 
 ```
@@ -132,7 +142,8 @@ server/src/agent/       shopper.ts (Gemini agent) · mandate.ts · gemini.ts
 server/src/market/      channel3.ts · catalog.ts (registry, market median)
 server/src/redteam/     attacks.ts · runner.ts · cli.ts · hijack.ts
 server/src/mcp/         server.ts (MCP server for any agent) · smoke.ts
-web/src/                console (React + Vite)
+web/src/                control room (React + Vite + Motion): console.tsx · pipeline.tsx · charts.tsx · arena.tsx · evidence.tsx
+server/src/telemetry.ts every outbound call and lifecycle step, timed and streamed
 ```
 
 ## Honest limits

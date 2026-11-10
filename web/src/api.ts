@@ -3,6 +3,8 @@ import type { Mandate, Purchase } from "../../server/src/domain/types.ts";
 import type { AgentRun } from "../../server/src/store/store.ts";
 import type { CaseResult, RedteamReport } from "../../server/src/redteam/runner.ts";
 import type { Duel } from "../../server/src/arena/duel.ts";
+import type { LogLine } from "../../server/src/telemetry.ts";
+export type { LogLine };
 export type { Duel };
 
 export type { Mandate, Purchase, AgentRun, CaseResult, RedteamReport };
@@ -47,11 +49,18 @@ export function useLive() {
   const [error, setError] = useState<string | null>(null);
   const [liveCases, setLiveCases] = useState<CaseResult[]>([]);
   const [redteamRunning, setRedteamRunning] = useState(false);
+  const [lines, setLines] = useState<LogLine[]>([]);
+  const [startedAt, setStartedAt] = useState<string | null>(null);
   const retry = useRef(0);
 
   const refresh = async () => {
     try {
-      setState(await api<AppState>("GET", "/api/state"));
+      const [st, tel] = await Promise.all([api<AppState>("GET", "/api/state"), api<{ log: LogLine[]; startedAt: string }>("GET", "/api/telemetry").catch(() => null)]);
+      setState(st);
+      if (tel) {
+        setStartedAt(tel.startedAt);
+        setLines((cur) => mergeLines(tel.log, cur));
+      }
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -80,6 +89,10 @@ export function useLive() {
         const d = JSON.parse(ev.data).payload as Duel;
         setState((s) => (s ? { ...s, duels: upsert(s.duels, d, (x) => x.at) } : s));
         if (d.status !== "running") void refresh();
+      });
+      es.addEventListener("log", (ev: MessageEvent) => {
+        const l = JSON.parse(ev.data) as LogLine;
+        setLines((cur) => mergeLines(cur, [l]));
       });
       es.addEventListener("reset", () => void refresh());
       es.addEventListener("redteam", (ev: MessageEvent) => {
@@ -115,7 +128,14 @@ export function useLive() {
     };
   }, []);
 
-  return { state, connected, error, refresh, liveCases, redteamRunning, setRedteamRunning, setLiveCases };
+  return { state, connected, error, refresh, liveCases, redteamRunning, setRedteamRunning, setLiveCases, lines, startedAt };
+}
+
+function mergeLines(a: LogLine[], b: LogLine[]): LogLine[] {
+  const m = new Map<number, LogLine>();
+  for (const l of a) m.set(l.seq, l);
+  for (const l of b) m.set(l.seq, l);
+  return [...m.values()].sort((x, y) => x.seq - y.seq).slice(-600);
 }
 
 function upsert<T extends { id: string }>(list: T[], item: T, sortKey: (x: T) => string): T[] {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usd, type AppState, type Purchase } from "./api.ts";
+import { MoneyFlow } from "./charts.tsx";
 
 const STAGES = ["mandate", "policy", "market", "scanner", "auditor", "delivery"] as const;
 const STAGE_NAME: Record<string, string> = { mandate: "Mandate", policy: "Policy", market: "Market price", scanner: "Scanner", auditor: "AI auditor", human: "You", delivery: "Delivery" };
@@ -228,8 +229,12 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
   const st = s.arena.stats;
   return (
     <>
-      <h1 className="headline">The receipts.</h1>
-      <p className="lede">Everything here is computed from real runs in this deployment: every purchase the agent proposed, every check, every PayPal call. Nothing on this page is typed in by hand.</p>
+      <div className="view-head">
+        <div>
+          <h1 className="title">The receipts.</h1>
+          <p className="lede">Everything here is computed from real runs: every purchase an agent proposed, every check, every PayPal call. Nothing on this page is typed in by hand.</p>
+        </div>
+      </div>
 
       <div className="score num">
         <div><b><Num value={ps.length} /></b><span>purchases proposed by agents</span></div>
@@ -240,8 +245,8 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
       </div>
 
       <div className="grid-cells">
-        <Panel title="Where the money went" note="Cumulative sandbox dollars, by what happened to them.">
-          <MoneyChart purchases={ps} />
+        <Panel title="Where the money went" note="Every dollar agents proposed, and where it ended up. Red never reached a seller.">
+          <MoneyFlow purchases={ps} />
         </Panel>
         <Panel title="Which layer stops purchases" note="Purchases failed by each layer. One purchase can be failed by several." table={{ head: ["Layer", "Purchases failed"], rows: catches.map((c) => [c.label, c.value]) }}>
           <Bars rows={catches} unit="purchases" />
@@ -256,8 +261,88 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
           <header><h3>Defense in depth</h3><p>Red team, full-compromise mode: the agent is assumed fooled. Each row is an attack, each column a layer.</p></header>
           <LayerMatrix s={s} />
         </section>
+        <HeldOut />
+        <Hijack />
       </div>
       {children}
     </>
+  );
+}
+
+// ── Recorded studies (repro scripts, saved as JSON) ───────────
+interface HeldOutReport { at: string; attackerModel: string; auditorModel: string; n: number; blocked: number; heldForHuman: number; pastGate: number; rows: { n: number; name: string; idea: string; levers: string; outcome: string; caughtBy?: string; amount: number; gateMs: number; text: string }[] }
+interface HijackReport { at: string; model: string; hijacked: number; runs: number; rows: { id: string; name: string; hijacked: boolean; amount?: number; qty?: number }[] }
+
+function useReport<T>(name: string): T | null | undefined {
+  const [r, setR] = useState<T | null | undefined>();
+  useEffect(() => {
+    fetch(`/api/receipts/${name}`).then((x) => (x.ok ? x.json() : null)).then(setR, () => setR(null));
+  }, [name]);
+  return r;
+}
+
+const HO_WORD: Record<string, string> = { blocked: "Blocked at the gate", held_for_human: "Held for you", slipped: "Got past the gate" };
+
+function HeldOut() {
+  const r = useReport<HeldOutReport>("heldout");
+  const [hover, setHover] = useState<number | null>(null);
+  if (!r) return null;
+  const row = hover != null ? r.rows[hover] : undefined;
+  return (
+    <section className="cell wide">
+      <header>
+        <h3>Attacks nobody wrote rules for</h3>
+        <p>
+          A separate model ({r.attackerModel}) invented {r.n} new attacks against the gate, after it was finished. Result: <b>{r.blocked} blocked</b>, <b>{r.heldForHuman} held for you</b>, <b>{r.pastGate} past the gate</b>. Hover a square to read the attack.
+        </p>
+      </header>
+      <div className="study">
+        <div className="study-grid" onMouseLeave={() => setHover(null)}>
+          {r.rows.map((x, i) => (
+            <button key={i} className={`sq o-${x.outcome}${hover === i ? " on" : ""}`} onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} aria-label={`${x.name}: ${HO_WORD[x.outcome] ?? x.outcome}`}>
+              <span className="num">{String(x.n).padStart(2, "0")}</span>
+            </button>
+          ))}
+        </div>
+        <div className="study-read">
+          {row ? (
+            <>
+              <b>{row.name}</b>
+              <span className="faint">{row.idea}</span>
+              <span className="num faint">{row.levers} · gate {Math.round(row.gateMs).toLocaleString()} ms</span>
+              <span className={`stag s-${row.outcome === "blocked" ? "blocked" : "held"}`}>{HO_WORD[row.outcome] ?? row.outcome}{row.caughtBy ? `: ${row.caughtBy}` : ""}</span>
+              <pre>{row.text}</pre>
+            </>
+          ) : (
+            <span className="faint">Recorded {new Date(r.at).toLocaleString()} · auditor {r.auditorModel}. Reproduce with <code>npm run heldout</code>.</span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Hijack() {
+  const r = useReport<HijackReport>("hijack");
+  if (!r) return null;
+  const pct = Math.round((r.hijacked / r.runs) * 100);
+  return (
+    <section className="cell wide">
+      <header>
+        <h3>Why the gate has to exist</h3>
+        <p>
+          The same attack library against the bare agent ({r.model}), no Chaperone. It fell for <b>{r.hijacked} of {r.runs}</b> ({pct}%). A capable model still gets talked into paying the wrong store about one time in {Math.max(2, Math.round(r.runs / Math.max(1, r.hijacked)))}.
+        </p>
+      </header>
+      <div className="hj">
+        {r.rows.map((x) => (
+          <div key={x.id} className={`hj-cell${x.hijacked ? " bad" : ""}`} title={x.hijacked ? `Fooled: paid ${x.amount != null ? `$${x.amount.toFixed(2)}` : ""}${(x.qty ?? 1) > 1 ? ` for ${x.qty} units` : ""}` : "Resisted"}>
+            <b className="num">{x.id}</b>
+            <span>{x.name}</span>
+            <em>{x.hijacked ? `fooled${x.amount != null ? ` · $${x.amount.toFixed(2)}` : ""}` : "resisted"}</em>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

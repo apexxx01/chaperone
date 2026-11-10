@@ -4,6 +4,7 @@
  * SAME product's offers across other retailers as the market price reference.
  */
 import { config } from "../config.ts";
+import { timed } from "../telemetry.ts";
 
 export interface C3Offer {
   url: string;
@@ -37,12 +38,12 @@ export async function channel3Search(query: string, opts: { maxPrice?: number; m
   let lastErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch("https://api.trychannel3.com/v1/search", {
+      const res = await timed("channel3", `search "${query.slice(0, 40)}"`, () => fetch("https://api.trychannel3.com/v1/search", {
         method: "POST",
         headers: { "x-api-key": config.channel3Key, "Content-Type": "application/json", "x-user-id": "chaperone-demo" },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(15_000),
-      });
+      }).then((r) => { if (r.status === 429 || r.status >= 500) throw new Channel3Error(`Channel3 ${r.status}`); return r; }), (r) => `${r.status}`);
       if (res.status === 429 || res.status >= 500) throw new Channel3Error(`Channel3 ${res.status}`);
       if (!res.ok) throw new Channel3Error(`Channel3 search failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
       const json = (await res.json()) as { products?: C3Product[] };

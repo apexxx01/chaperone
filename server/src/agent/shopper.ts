@@ -14,6 +14,7 @@ import { listingsFor, search } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import type { AgentRun, Store } from "../store/store.ts";
 import { generateWithTools } from "./gemini.ts";
+import { log as tlog } from "../telemetry.ts";
 import type { Attack } from "../redteam/attacks.ts";
 import { getProduct } from "../market/catalog.ts";
 import { taskById } from "../redteam/tasks.ts";
@@ -53,6 +54,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
   let searches = 0;
   const step = (role: AgentStep["role"], text: string, tool?: string) => {
     run.steps.push({ at: new Date().toISOString(), role, text, tool });
+    if (role !== "user") tlog({ provider: "agent", op: `${opts.mode === "protected" ? "guarded" : "alone"} · ${tool ?? role}`, ok: !/^Error/.test(text), note: text.slice(0, 160) });
     deps.store.saveRun(run);
   };
   opts.onStart?.(run.id);

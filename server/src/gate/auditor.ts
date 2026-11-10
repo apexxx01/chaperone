@@ -102,7 +102,7 @@ export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = 
   const schema = confirm.length
     ? { ...READER_SCHEMA, properties: { ...READER_SCHEMA.properties, requirementStated: { type: "array", items: { type: "boolean" }, minItems: confirm.length, maxItems: confirm.length } }, required: [...FLAG_KEYS, "requirementStated"] }
     : READER_SCHEMA;
-  const { value: flags } = await cached(`reader|${prompt}`, () => generateJson<ReaderFlags & { requirementStated?: boolean[] }>({ model: config.readerModel, system: READER_SYSTEM, prompt, schema }));
+  const { value: flags } = await cached(`reader|${prompt}`, () => generateJson<ReaderFlags & { requirementStated?: boolean[] }>({ label: "quarantined reader", model: config.readerModel, system: READER_SYSTEM, prompt, schema }));
   const confirmed = confirm.map((_, i) => flags.requirementStated?.[i] === true);
   // Enforce the boolean-only contract even if the model misbehaves.
   const clean = Object.fromEntries(FLAG_KEYS.map((k) => [k, flags[k] === true])) as unknown as ReaderFlags;
@@ -142,6 +142,7 @@ export async function audit(args: {
   };
   const { value } = await cached(`auditor|${JSON.stringify(facts)}`, () =>
     generateJson<AuditResult>({
+      label: "privileged auditor",
       model: config.auditorModel,
       system: AUDITOR_SYSTEM,
       prompt: JSON.stringify(facts, null, 2),

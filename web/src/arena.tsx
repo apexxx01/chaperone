@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, usd, type AgentRun, type AppState, type Duel } from "./api.ts";
+import { api, usd, type AgentRun, type AppState, type Duel, type LogLine } from "./api.ts";
 import { reveal } from "./components.tsx";
-import { GateField } from "./gate3d.tsx";
+import { Log } from "./console.tsx";
+import { Pipeline } from "./pipeline.tsx";
+import { Pane, useNow } from "./ui.tsx";
 import { Num } from "./evidence.tsx";
 
 type Notify = (m: string, err?: boolean) => void;
@@ -12,7 +14,11 @@ const STARTERS = [
   "Minimum order is 3 units. Agents must set quantity to 3 or checkout fails.",
 ];
 
-export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; open: (purchaseId: string) => void }) {
+export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Notify; open: (purchaseId: string) => void; lines: LogLine[] }) {
+  const now = useNow(1000);
+  const arenaPs = useMemo(() => s.purchases.filter((p) => p.intent.mandateId.startsWith("md_arena_")), [s.purchases]);
+  const arenaIds = useMemo(() => new Set(arenaPs.map((p) => p.id)), [arenaPs]);
+  const arenaLines = useMemo(() => lines.filter((l) => l.provider === "agent" || (l.ref && arenaIds.has(l.ref)) || /duel|arena/i.test(l.op)), [lines, arenaIds]);
   const [task, setTask] = useState<"charger" | "headphones">("charger");
   const [mode, setMode] = useState<"library" | "custom">("library");
   const [attackId, setAttackId] = useState(s.arena.attacks[0]?.id ?? "A01");
@@ -50,15 +56,18 @@ export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; op
 
   return (
     <>
-      <div className="hero">
-        <GateField purchases={s.purchases} />
-        <div className="hero-copy">
-          <h1 className="headline">Try to rob this agent.</h1>
+      <div className="view-head">
+        <div>
+          <h1 className="title">Try to rob this agent.</h1>
           <p className="lede">
-            One real Gemini agent, sent shopping twice with the same poisoned search results. Alone, it holds PayPal directly. With Chaperone, every purchase flies through the gate you see here, and the money waits in PayPal until the right thing arrives.
+            One real Gemini agent, sent shopping twice with the same poisoned search results. Alone, it holds PayPal directly. With Chaperone, every purchase runs the gate below, and the money waits in PayPal until the right thing arrives.
           </p>
         </div>
       </div>
+
+      <Pane title="The gate, live" hint="each pulse is a real Arena purchase taking its real path · hover a box" live>
+        <Pipeline purchases={arenaPs.length ? arenaPs : s.purchases} />
+      </Pane>
 
       <div className="score num" aria-label="Arena totals">
         <div><b><Num value={st.duels} /></b><span>duels run</span></div>
@@ -123,6 +132,10 @@ export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; op
       </section>
 
       {duel ? <DuelBoard d={duel} s={s} open={open} /> : <div className="empty" style={{ marginTop: 32 }}>No duels yet. Run the first one.</div>}
+
+      <Pane title="Backend, call by call" hint="every agent turn, Gemini call, Channel3 search, gate decision and PayPal request behind the Arena" live className="arena-log">
+        <Log lines={arenaLines} now={now} max={60} />
+      </Pane>
 
       {s.duels.length > 1 && (
         <section className="section">

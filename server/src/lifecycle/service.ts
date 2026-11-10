@@ -19,6 +19,7 @@ import { PayPalError } from "../paypal/types.ts";
 import type { Store } from "../store/store.ts";
 import { verifyDelivery, type ProofPhoto } from "./delivery.ts";
 import { appendEvent } from "./receipt.ts";
+import { log as tlog } from "../telemetry.ts";
 
 const now = () => new Date().toISOString();
 
@@ -53,6 +54,7 @@ export class Chaperone {
 
   private event(p: Purchase, kind: string, label: string, detail?: string, ms?: number) {
     appendEvent(p, { at: now(), kind, label, detail, ms: ms == null ? undefined : Math.round(ms) });
+    tlog({ provider: kind === "gate" ? "gate" : "lifecycle", op: label, ms, ok: kind !== "error", note: detail?.slice(0, 160), ref: p.id });
   }
 
   mandate(id: string): Mandate {

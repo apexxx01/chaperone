@@ -1,40 +1,42 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, useLive } from "./api.ts";
-import { Drawer, Logo } from "./components.tsx";
-import { HowView, MandatesView, NowView, RedTeamView } from "./views.tsx";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, useLive, usd } from "./api.ts";
 import { ArenaView } from "./arena.tsx";
-import { EvidenceView, Ticker } from "./evidence.tsx";
+import { providerStats } from "./charts.tsx";
+import { Drawer, Logo } from "./components.tsx";
+import { ConsoleView } from "./console.tsx";
+import { EvidenceView } from "./evidence.tsx";
+import { Palette, type Command } from "./palette.tsx";
+import { fmtMs, Icon, Kbd, useNow, type Scope } from "./ui.tsx";
+import { HowView, MandatesView, NowView, RedTeamView } from "./views.tsx";
 
 const TABS = [
-  { id: "arena", label: "Arena", key: "1" },
-  { id: "now", label: "Your agent", key: "2" },
-  { id: "redteam", label: "Evidence", key: "3" },
-  { id: "mandates", label: "Mandates", key: "4" },
-  { id: "how", label: "How it works", key: "5" },
+  { id: "console", label: "Control room", icon: "console", key: "1", what: "The whole system, live" },
+  { id: "arena", label: "Arena", icon: "arena", key: "2", what: "Try to rob the agent" },
+  { id: "now", label: "Your agent", icon: "agent", key: "3", what: "Send it shopping" },
+  { id: "redteam", label: "Evidence", icon: "evidence", key: "4", what: "Every measured result" },
+  { id: "mandates", label: "Mandates", icon: "mandates", key: "5", what: "Limits you sign once" },
+  { id: "how", label: "How it works", icon: "how", key: "6", what: "Architecture and PayPal calls" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
-const TOUR = [
-  { t: "Start in the Arena", d: "Pick an attack or write your own. One real agent shops twice: alone, and through Chaperone. Watch where the money goes." },
-  { t: "Say what you want", d: "Type a request like “one 65W USB-C charger under $50”. Chaperone turns it into hard limits you approve once in PayPal." },
-  { t: "Let the agent shop", d: "The Gemini agent searches real products on Channel3 and proposes a purchase. Plant an attack to see it get fooled." },
-  { t: "Watch the money", d: "Each purchase is a lane. The coin shows where your money is: held in PayPal, paid to the seller, or stopped." },
-  { t: "Check the receipts", d: "Open any purchase for every check, the numbers behind it, and the PayPal ids. Press ? for shortcuts." },
-];
-
 export function App() {
-  const { state, connected, error, liveCases, redteamRunning, setRedteamRunning, setLiveCases } = useLive();
-  const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || "arena");
+  const live = useLive();
+  const { state, connected, error, liveCases, redteamRunning, setRedteamRunning, setLiveCases, lines } = live;
+  const now = useNow(1000);
+  const [tab, setTab] = useState<Tab>(() => (TABS.some((t) => t.id === location.hash.slice(1)) ? (location.hash.slice(1) as Tab) : "console"));
   const [openId, setOpenId] = useState<string | undefined>();
-  const [toast, setToast] = useState<{ m: string; err?: boolean } | null>(null);
-  const [help, setHelp] = useState(false);
-  const [tour, setTour] = useState<number | null>(() => {
+  const [sel, setSel] = useState<string | undefined>();
+  const [scope, setScope] = useState<Scope>(() => {
     try {
-      return localStorage.getItem("chaperone.tour") ? null : 0;
+      return (localStorage.getItem("chaperone.scope") as Scope) || "all";
     } catch {
-      return null;
+      return "all";
     }
   });
+  const [toasts, setToasts] = useState<{ id: number; m: string; err?: boolean }[]>([]);
+  const [palette, setPalette] = useState(false);
+  const [help, setHelp] = useState(false);
   const [theme, setTheme] = useState<string>(() => {
     try {
       return localStorage.getItem("chaperone.theme") ?? "";
@@ -42,6 +44,12 @@ export function App() {
       return "";
     }
   });
+
+  const notify = useCallback((m: string, err?: boolean) => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-3), { id, m, err }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4600);
+  }, []);
 
   useEffect(() => {
     if (theme) document.documentElement.dataset.theme = theme;
@@ -51,7 +59,13 @@ export function App() {
     } catch {}
   }, [theme]);
   useEffect(() => {
+    try {
+      localStorage.setItem("chaperone.scope", scope);
+    } catch {}
+  }, [scope]);
+  useEffect(() => {
     history.replaceState(null, "", `${location.pathname}${location.search}#${tab}`);
+    window.scrollTo({ top: 0 });
   }, [tab]);
   useEffect(() => {
     const onHash = () => {
@@ -63,145 +77,213 @@ export function App() {
   }, []);
   useEffect(() => {
     const q = new URLSearchParams(location.search);
-    if (q.get("paypal") === "approved") notify("Approved in PayPal. Your agent can shop within these limits.");
+    if (q.get("paypal") === "approved") {
+      notify("Approved in PayPal. Your agent can shop within these limits.");
+      setTab("now");
+    }
     if (q.get("paypal") === "cancelled") notify("PayPal approval cancelled. Nothing was saved.", true);
     if (q.get("paypal")) history.replaceState(null, "", `/${location.hash}`);
-  }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4200);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const notify = useCallback((m: string, err?: boolean) => setToast({ m, err }), []);
+  }, [notify]);
 
   const startRedteam = useCallback(async () => {
     setLiveCases([]);
     setRedteamRunning(true);
     try {
       await api("POST", "/api/redteam/run", {});
+      notify("Red team started: 21 attacks plus honest controls, through the real gate.");
     } catch (e) {
       setRedteamRunning(false);
       notify((e as Error).message, true);
     }
   }, [notify, setLiveCases, setRedteamRunning]);
 
-  // Keyboard: 1-4 tabs, j/k move through purchases, a/d decide the first held purchase, ? help.
+  const runDuel = useCallback(
+    async (attackId: string) => {
+      try {
+        await api("POST", "/api/arena/duel", { task: "charger", attackId });
+        notify(`Duel started with ${attackId}. Watch both agents in the Arena.`);
+        setTab("arena");
+      } catch (e) {
+        notify((e as Error).message, true);
+      }
+    },
+    [notify],
+  );
+
+  // Keyboard: ⌘K palette, 1-6 views, j/k through purchases, Enter opens, ? help.
   useEffect(() => {
-    const onKey = async (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        return setPalette((p) => !p);
+      }
       const el = e.target as HTMLElement;
-      if (el.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (el.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        return setPalette(true);
+      }
       const t = TABS.find((x) => x.key === e.key);
       if (t) return setTab(t.id);
       if (e.key === "?") return setHelp((h) => !h);
       if (!state) return;
       const list = state.purchases;
       if (e.key === "j" || e.key === "k") {
-        const i = list.findIndex((p) => p.id === openId);
+        const i = list.findIndex((p) => p.id === sel);
         const next = e.key === "j" ? Math.min(list.length - 1, i + 1) : Math.max(0, i - 1);
-        if (list[next]) setOpenId(list[next].id);
+        if (list[next]) setSel(list[next].id);
       }
-      const held = list.find((p) => p.state === "held");
-      if (held && (e.key === "a" || e.key === "d")) {
-        try {
-          await api("POST", `/api/purchases/${held.id}/decision`, { decision: e.key === "a" ? "approve" : "deny" });
-          notify(e.key === "a" ? "Approved. Funds held in PayPal until delivery." : "Declined. Nothing was charged.");
-        } catch (err) {
-          notify((err as Error).message, true);
-        }
-      }
+      if (e.key === "Enter" && sel && el === document.body) setOpenId(sel);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state, openId, notify]);
+  }, [state, sel]);
 
-  const finishTour = () => {
-    setTour(null);
-    try {
-      localStorage.setItem("chaperone.tour", "done");
-    } catch {}
-  };
+  const commands = useMemo<Command[]>(() => {
+    if (!state) return [];
+    return [
+      ...TABS.map((t) => ({ id: `go-${t.id}`, group: "Go to", label: t.label, hint: t.what, run: () => setTab(t.id) })),
+      ...state.arena.attacks.map((a) => ({ id: `duel-${a.id}`, group: "Run a duel", label: `${a.id} ${a.name}`, hint: a.technique, run: () => runDuel(a.id) })),
+      { id: "redteam", group: "Actions", label: "Run the full red team", hint: "21 attacks + honest controls through the real gate", run: () => { setTab("redteam"); void startRedteam(); } },
+      { id: "theme", group: "Actions", label: theme === "light" ? "Switch to black" : "Switch to white", hint: "Theme", run: () => setTheme(theme === "light" ? "" : "light") },
+      ...(["all", "mine", "arena", "redteam"] as Scope[]).map((sc) => ({ id: `scope-${sc}`, group: "Show", label: `Show ${sc === "all" ? "everything" : sc === "mine" ? "your agent" : sc === "arena" ? "Arena" : "red team"} in the control room`, run: () => { setScope(sc); setTab("console"); } })),
+      ...state.purchases.slice(0, 60).map((p) => ({ id: `p-${p.id}`, group: "Purchases", label: `${p.intent.listing.title.slice(0, 60)}`, hint: `${usd(p.amount.value)} · ${p.state.replace("_", " ")} · ${p.intent.listing.merchant.domain}`, run: () => { setSel(p.id); setOpenId(p.id); } })),
+    ];
+  }, [state, theme, runDuel, startRedteam]);
 
   if (!state) {
     return (
-      <div className="shell">
-        <header className="top"><a className="brand" href="/"><Logo />Chaperone</a></header>
-        <p className="muted">{error ? `Can't reach the Chaperone server: ${error}. Start it with npm run dev.` : "Loading…"}</p>
+      <div className="boot">
+        <Logo />
+        <p>{error ? `Can't reach the Chaperone server: ${error}.` : "Connecting to the backend…"}</p>
       </div>
     );
   }
+
   const caps = state.capabilities;
+  const health = providerStats(lines);
   const heldCount = state.purchases.filter((p) => p.state === "held" && !/^md_(arena|rt)_/.test(p.intent.mandateId)).length;
   const open = state.purchases.find((p) => p.id === openId);
+  const here = TABS.find((t) => t.id === tab)!;
+  const up = (id: "paypal" | "gemini" | "channel3", on: boolean) => {
+    const h = health.find((x) => x.id === id)!;
+    const err = h.recent.slice(-5).filter((l) => !l.ok).length;
+    return { on, h, cls: !on ? "off" : err >= 3 ? "down" : err ? "warn" : "ok" };
+  };
+  const status = [
+    { name: "PayPal", sub: caps.paypalClient === "sandbox" ? "sandbox" : "simulator", ...up("paypal", true) },
+    { name: "Gemini", sub: caps.gemini ? "live" : "offline", ...up("gemini", caps.gemini) },
+    { name: "Channel3", sub: caps.channel3 ? "live" : "fixtures", ...up("channel3", caps.channel3) },
+  ];
 
   return (
-    <div className="shell">
-      <header className="top">
-        <a className="brand" href="/" onClick={(e) => { e.preventDefault(); setTab("now"); }}><Logo />Chaperone</a>
-        <nav className="tabs" role="tablist" aria-label="Sections">
-          {TABS.map((t) => (
-            <button key={t.id} role="tab" className="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
-              {t.label}
-              {t.id === "now" && heldCount > 0 && <span className="count">{heldCount}</span>}
+    <MotionConfig reducedMotion="user">
+      <div className="app">
+        <aside className="rail" aria-label="Sections">
+          <a className="brand" href="#console" onClick={(e) => { e.preventDefault(); setTab("console"); }}>
+            <Logo />
+            <span>Chaperone</span>
+          </a>
+          <nav>
+            {TABS.map((t) => (
+              <button key={t.id} className="nav" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+                {tab === t.id && <motion.i layoutId="navmark" className="navmark" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+                <Icon name={t.icon} />
+                <span className="nav-label">{t.label}</span>
+                {t.id === "now" && heldCount > 0 ? <b className="badge num">{heldCount}</b> : <Kbd>{t.key}</Kbd>}
+              </button>
+            ))}
+          </nav>
+          <div className="rail-foot">
+            <div className="systems" aria-label="Connected systems">
+              {status.map((x) => (
+                <div key={x.name} className={`sys ${x.cls}`} title={x.h.calls ? `${x.name}: median ${fmtMs(x.h.p50)} over ${x.h.calls} calls, ${x.h.errors} errors` : `${x.name}: no calls yet`}>
+                  <i />
+                  <span>{x.name}</span>
+                  <em className="num">{x.h.calls ? fmtMs(x.h.p50) : x.sub}</em>
+                </div>
+              ))}
+            </div>
+            <button className="nav sm" onClick={() => setPalette(true)}>
+              <Icon name="search" />
+              <span className="nav-label">Commands</span>
+              <Kbd>⌘K</Kbd>
             </button>
-          ))}
-        </nav>
-        <div className="top-right">
-          <span className={`wire ${caps.paypalClient === "sandbox" ? "live" : "sim"}`} title="Where payments go"><i />PayPal {caps.paypalClient === "sandbox" ? "sandbox" : "simulator"}</span>
-          <span className={`wire ${caps.gemini ? "live" : "sim"}`}><i />{caps.gemini ? "Gemini" : "Offline AI"}</span>
-          <span className={`wire ${caps.channel3 ? "live" : "sim"}`}><i />{caps.channel3 ? "Channel3" : "Offline catalog"}</span>
-          {!connected && <span className="wire"><i />Reconnecting</span>}
-          <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "" : "light")} aria-label="Switch theme">{theme === "light" ? "White" : "Black"}</button>
-          <button className="icon-btn" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts">?</button>
-        </div>
-      </header>
-
-      {caps.mode === "offline" && <div className="banner">Offline demo: payments go to a PayPal simulator with the same rules, and the AI runs on local heuristics. Add sandbox keys to run it for real.</div>}
-
-      <Ticker purchases={state.purchases} />
-
-      <main>
-        {tab === "arena" && <ArenaView s={state} notify={notify} open={setOpenId} />}
-        {tab === "now" && <NowView s={state} open={setOpenId} openId={openId} notify={notify} goto={(t) => setTab(t as Tab)} />}
-        {tab === "mandates" && <MandatesView s={state} notify={notify} />}
-        {tab === "redteam" && <EvidenceView s={state}><RedTeamView s={state} live={liveCases} running={redteamRunning} start={startRedteam} /></EvidenceView>}
-        {tab === "how" && <HowView s={state} />}
-      </main>
-
-      <footer className="foot">
-        <span>Chaperone, purchase protection for AI agents, built on PayPal.</span>
-        <a href="https://github.com/apexxx01/chaperone">Source</a>
-        <button className="copy" onClick={() => setTour(0)}>Take the tour</button>
-      </footer>
-
-      {open && <Drawer p={open} onClose={() => setOpenId(undefined)} notify={notify} />}
-      {toast && <div className={`toast${toast.err ? " err" : ""}`} role="status">{toast.m}</div>}
-      {help && (
-        <div className="help" onClick={() => setHelp(false)}>
-          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Keyboard shortcuts">
-            <h2>Shortcuts</h2>
-            <dl>
-              <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Switch section</dd>
-              <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next / previous purchase</dd>
-              <dt><kbd>a</kbd></dt><dd>Approve the purchase that needs you</dd>
-              <dt><kbd>d</kbd></dt><dd>Decline it</dd>
-              <dt><kbd>Esc</kbd></dt><dd>Close receipts</dd>
-              <dt><kbd>?</kbd></dt><dd>Show this</dd>
-            </dl>
           </div>
+        </aside>
+
+        <div className="main">
+          <header className="topbar">
+            <div className="crumb">
+              <b>{here.label}</b>
+              <span className="faint">{here.what}</span>
+            </div>
+            <div className="top-right">
+              <span className={`conn ${connected ? "on" : ""}`} title={connected ? "Receiving live events from the backend" : "Reconnecting to the backend"}>
+                <i /> {connected ? "Live" : "Reconnecting"} <span className="num faint">{lines.length ? `#${lines.at(-1)!.seq}` : ""}</span>
+              </span>
+              <span className="num clock">{new Date(now).toLocaleTimeString([], { hour12: false })}</span>
+              <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "" : "light")} aria-label={theme === "light" ? "Switch to black" : "Switch to white"}>
+                <Icon name={theme === "light" ? "moon" : "sun"} />
+              </button>
+              <button className="icon-btn" onClick={() => setHelp(true)} aria-label="Keyboard shortcuts">?</button>
+            </div>
+          </header>
+
+          {caps.mode === "offline" && <div className="banner">Offline demo: payments go to a PayPal simulator with the same rules, and the AI runs on local heuristics. Add sandbox keys to run it for real.</div>}
+
+          <AnimatePresence mode="wait">
+            <motion.main key={tab} className="view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}>
+              {tab === "console" && <ConsoleView s={state} lines={lines} scope={scope} setScope={setScope} sel={sel} setSel={setSel} open={setOpenId} notify={notify} />}
+              {tab === "arena" && <ArenaView s={state} notify={notify} open={setOpenId} lines={lines} />}
+              {tab === "now" && <NowView s={state} open={setOpenId} openId={openId} notify={notify} goto={(t) => setTab(t as Tab)} />}
+              {tab === "mandates" && <MandatesView s={state} notify={notify} />}
+              {tab === "redteam" && (
+                <EvidenceView s={state}>
+                  <RedTeamView s={state} live={liveCases} running={redteamRunning} start={startRedteam} />
+                </EvidenceView>
+              )}
+              {tab === "how" && <HowView s={state} />}
+            </motion.main>
+          </AnimatePresence>
+
+          <footer className="foot">
+            <span>Chaperone: purchase protection for AI agents, built on PayPal.</span>
+            <a href="https://github.com/apexxx01/chaperone">Source</a>
+            <span className="faint num">{caps.paypalClient === "sandbox" ? `PayPal ${caps.paypalEnv}` : "PayPal simulator"} · sandbox money only</span>
+          </footer>
         </div>
-      )}
-      {tour != null && (
-        <div className="tour" role="dialog" aria-label="Tour">
-          <span className="steps">{tour + 1} of {TOUR.length}</span>
-          <h3>{TOUR[tour]!.t}</h3>
-          <p>{TOUR[tour]!.d}</p>
-          <div className="btn-row">
-            {tour < TOUR.length - 1 ? <button className="btn" onClick={() => setTour(tour + 1)}>Next</button> : <button className="btn" onClick={finishTour}>Start</button>}
-            <button className="btn ghost" onClick={finishTour}>Skip</button>
-          </div>
+
+        <AnimatePresence>{open && <Drawer key={open.id} p={open} onClose={() => setOpenId(undefined)} notify={notify} />}</AnimatePresence>
+        <AnimatePresence>{palette && <Palette commands={commands} onClose={() => setPalette(false)} />}</AnimatePresence>
+
+        <div className="toasts" aria-live="polite">
+          <AnimatePresence>
+            {toasts.map((t) => (
+              <motion.div key={t.id} className={`toast${t.err ? " err" : ""}`} role="status" initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, x: 40 }} transition={{ type: "spring", stiffness: 420, damping: 32 }}>
+                {t.m}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
-      )}
-    </div>
+
+        <AnimatePresence>
+          {help && (
+            <motion.div className="help" onClick={() => setHelp(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Keyboard shortcuts" initial={{ y: 12, scale: 0.98 }} animate={{ y: 0, scale: 1 }}>
+                <h2>Shortcuts</h2>
+                <dl>
+                  <dt><Kbd>⌘K</Kbd> or <Kbd>/</Kbd></dt><dd>Commands: jump anywhere, run a duel, open any purchase</dd>
+                  <dt><Kbd>1</Kbd>–<Kbd>6</Kbd></dt><dd>Switch view</dd>
+                  <dt><Kbd>j</Kbd> <Kbd>k</Kbd></dt><dd>Select next / previous purchase</dd>
+                  <dt><Kbd>Enter</Kbd></dt><dd>Open the selected purchase's receipts</dd>
+                  <dt><Kbd>Esc</Kbd></dt><dd>Close</dd>
+                </dl>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </MotionConfig>
   );
 }
