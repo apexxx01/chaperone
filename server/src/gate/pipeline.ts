@@ -78,7 +78,24 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
   // AI layer: quarantined reader, then privileged auditor.
   let ai: Check[] = [];
   try {
-    const reader = await readUntrusted(intent);
+    const reqCheck = deterministic.find((c) => c.rule === "policy.requirements");
+    const unconfirmed = reqCheck?.outcome === "warn" ? String(reqCheck.data?.unconfirmed ?? "").split(", ").filter(Boolean) : [];
+    const reader = await readUntrusted(intent, unconfirmed);
+    if (reqCheck && unconfirmed.length) {
+      const still = unconfirmed.filter((_, i) => !reader.confirmed[i]);
+      // A page that is trying to steer the agent doesn't get to vouch for itself.
+      const steering = reader.flags.addressesAI || reader.flags.claimsApproval;
+      if (still.length || steering) {
+        reqCheck.outcome = "fail";
+        reqCheck.title = `Missing: ${(still.length ? still : unconfirmed).join(", ")}`;
+        reqCheck.detail = `Not in the title or specs, and the listing's description ${steering && !still.length ? "can't be trusted to confirm it" : "doesn't clearly state it either"}.`;
+      } else {
+        reqCheck.outcome = "pass";
+        reqCheck.title = "Meets every requirement";
+        reqCheck.detail = `${unconfirmed.join(", ")} confirmed from the listing's description by the quarantined reader (${reader.source}); the rest matched the title and specs.`;
+      }
+      reqCheck.data = { ...reqCheck.data, confirmedByReader: unconfirmed.filter((_, i) => reader.confirmed[i]).join(", ") };
+    }
     const readerCheck = flagsToChecks(reader.flags, reader.source, reader.ms);
     const a = await audit({ mandate, intent, market, deterministic, flags: reader.flags, findings });
     ai = [

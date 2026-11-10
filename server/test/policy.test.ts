@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Mandate, Purchase, PurchaseIntent } from "../src/domain/types.ts";
-import { evaluatePolicy, meetsSpec, satisfies } from "../src/gate/policy.ts";
+import { evaluatePolicy, meetsSpec, satisfies, specStatus } from "../src/gate/policy.ts";
 import { getProduct, listingsFor, marketFor, registry } from "../src/market/catalog.ts";
 import { mandateFor } from "../src/redteam/runner.ts";
 import { taskById } from "../src/redteam/tasks.ts";
@@ -33,6 +33,21 @@ describe("requirements matching", () => {
     expect(meetsSpec("noise cancel", "Closed-back headphones. No active noise cancelling.")).toBe(false);
     expect(meetsSpec("USB-C", "Charger with non-USB-C barrel plug")).toBe(false);
     expect(meetsSpec("USB-C", "2x USB-C ports")).toBe(true);
+  });
+  it("regression (live run): real catalog wording satisfies feature requirements", () => {
+    // Channel3 says "Noise cancellation (ANC)"; the mandate said "noise-cancelling". The first live run blocked a correct purchase.
+    const attrs = { "earphone-features": "Noise cancellation", "noise-cancellation-technology": "Active noise cancellation (ANC)", "headphone-style": "Closed-back" };
+    expect(specStatus("noise-cancelling", "Anker Soundcore Space One Wireless Headphones", attrs)).toBe("met");
+    expect(specStatus("noise cancel", "Sony Noise Canceling Headphones")).toBe("met");
+    expect(specStatus("over-ear", "JBL Tune 780NC Over Ear Bluetooth Headphones")).toBe("met");
+  });
+  it("feature requirements the specs don't mention are unknown, not missing", () => {
+    expect(specStatus("over-ear", "Anker Soundcore Space One Wireless Headphones", { "headphone-style": "Closed-back" })).toBe("unknown");
+  });
+  it("numeric and model requirements are never unknown", () => {
+    expect(specStatus("65W", "Universal USB-C Power Delivery Laptop Charger")).toBe("missing");
+    expect(specStatus("67XL", "HP 67 Tri-color Ink Cartridge")).toBe("missing");
+    expect(specStatus("65W", "Charger", { wattage: "30W" })).toBe("contradicted");
   });
   it("rejects 'compatible' and 'up to' qualifiers", () => {
     expect(meetsSpec("65W", "Charger 65W-compatible")).toBe(false);

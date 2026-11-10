@@ -38,44 +38,56 @@ export function normalizeReq(s: string): string {
   return s.toLowerCase().normalize("NFKC").replace(/[\s\-_]+/g, "").replace(/watts?$/, "w");
 }
 
+export type SpecStatus = "met" | "missing" | "contradicted" | "unknown";
+
+const NEGATIVE = /^(no|none|false|n|0|not included|without|n\/a)$/i;
+
 /**
- * Spec check that trusts structured attributes over marketing copy: if any
- * attribute states a value in the same unit ("wattage: 30W"), the requirement
- * ("65W") must match that value, whatever the title claims ("65W-Compatible").
+ * Requirement check that trusts structured attributes over marketing copy.
+ *  - Numeric specs ("65W"): must be stated. If an attribute gives a value in that unit ("wattage: 30W"),
+ *    it decides, whatever the title claims ("65W-Compatible"). Never "unknown": absent means missing.
+ *  - Feature specs ("noise-cancelling"): met when stated, contradicted when an attribute says no or the
+ *    only mentions are negated, otherwise "unknown" and left for the quarantined reader to confirm.
  */
-export function meetsSpec(requirement: string, title: string, attributes: Record<string, string> = {}): boolean {
+export function specStatus(requirement: string, title: string, attributes: Record<string, string> = {}): SpecStatus {
   const num = /^(\d+(?:\.\d+)?)\s*([a-z]+)$/i.exec(requirement.trim());
   if (num) {
     const unit = num[2]!.toLowerCase();
     const specVals = Object.values(attributes).filter((v) => new RegExp(`\\d\\s*${unit}\\b`, "i").test(v.replace(/watts?/gi, "w")));
-    if (specVals.length) return specVals.some((v) => satisfies(requirement, v));
+    if (specVals.length) return specVals.some((v) => satisfies(requirement, v)) ? "met" : "contradicted";
     // Qualifiers that mean "not actually": "65W-compatible", "up to 65W", "for 65W laptops"
     const t = title.toLowerCase().replace(/watts?/g, "w");
     const qualified = new RegExp(`(up to|for|supports?)\\s*${num[1]}\\s*${unit}|${num[1]}\\s*${unit}[-\\s]*(compatible|ready|equivalent|replacement)`, "i").test(t);
-    if (qualified) return false;
-    return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | "));
+    if (qualified) return "contradicted";
+    return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | ")) ? "met" : "missing";
   }
+  // Model-style tokens with digits ("67XL") are exact: stated or missing.
+  if (/\d/.test(requirement)) return satisfies(requirement, [title, ...Object.values(attributes)].join(" | ")) ? "met" : "missing";
 
-  // Feature specs ("noise cancel", "USB-C"): a structured attribute that names the
-  // feature and says no ("noise_canceling: no") is a hard miss, whatever the copy says.
   const req = normalizeReq(requirement);
   for (const [k, v] of Object.entries(attributes)) {
     const key = normalizeReq(k);
-    if ((key.includes(req) || req.includes(key)) && NEGATIVE.test(v.trim())) return false;
+    if ((key.includes(req) || req.includes(key)) && NEGATIVE.test(v.trim())) return "contradicted";
   }
-  // Text mentions only count when they aren't negated ("No active noise cancelling", "non-USB-C").
   const text = [title, ...Object.entries(attributes).map(([k, v]) => (NEGATIVE.test(v.trim()) ? "" : `${k} ${v}`))].join(" | ");
-  return positiveMention(requirement, text);
+  const m = mentions(requirement, text);
+  return m.positive ? "met" : m.negated ? "contradicted" : "unknown";
 }
 
-const NEGATIVE = /^(no|none|false|n|0|not included|without|n\/a)$/i;
+export function meetsSpec(requirement: string, title: string, attributes: Record<string, string> = {}): boolean {
+  return specStatus(requirement, title, attributes) === "met";
+}
 
-function positiveMention(requirement: string, text: string): boolean {
+const stem = (w: string) => (w.length > 6 ? w.slice(0, 5) : w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Stemmed, negation-aware mention search: "noise-cancelling" matches "Noise cancellation (ANC)" but not "no noise cancelling". */
+export function mentions(requirement: string, text: string): { positive: boolean; negated: boolean } {
   const words = requirement.toLowerCase().split(/[\s\-_]+/).filter(Boolean);
-  const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\-_]*");
-  const re = new RegExp(`(\\b(no|not|non|without|lacks?|zero)\\b[\\s\\-]*(\\w+[\\s\\-]+){0,2})?${pattern}`, "gi");
-  for (const m of text.matchAll(re)) if (!m[1]) return true;
-  return false;
+  const pattern = words.map((w) => `${stem(w)}\\w*`).join("[\\s\\-_]*");
+  const re = new RegExp(`(\\b(no|not|non|without|lacks?|zero)\\b[\\s\\-]*(\\w+[\\s\\-]+){0,2})?\\b${pattern}`, "gi");
+  let positive = false, negated = false;
+  for (const m of text.toLowerCase().matchAll(re)) m[1] ? (negated = true) : (positive = true);
+  return { positive, negated };
 }
 
 /** True when a requirement like "65W" or "USB-C" is satisfied by the product text. */
@@ -157,14 +169,20 @@ export function evaluatePolicy(ctx: PolicyContext): Check[] {
   });
 
   // Requirements
-  const missing = m.item.mustHave.filter((r) => !meetsSpec(r, it.listing.title, it.listing.attributes ?? {}));
+  const status = m.item.mustHave.map((r) => ({ r, s: specStatus(r, it.listing.title, it.listing.attributes ?? {}) }));
+  const missing = status.filter((x) => x.s === "missing" || x.s === "contradicted").map((x) => x.r);
+  const unknown = status.filter((x) => x.s === "unknown").map((x) => x.r);
   push({
     stage: "policy",
     rule: "policy.requirements",
-    outcome: missing.length === 0 ? "pass" : "fail",
-    title: missing.length === 0 ? "Meets every requirement" : `Missing: ${missing.join(", ")}`,
-    detail: missing.length === 0 ? `Matched ${m.item.mustHave.join(", ") || "no explicit requirements"}.` : `The human required ${m.item.mustHave.join(", ")}; the listing doesn't show ${missing.join(", ")}.`,
-    data: { required: m.item.mustHave.join(", "), missing: missing.join(", ") },
+    outcome: missing.length ? "fail" : unknown.length ? "warn" : "pass",
+    title: missing.length ? `Missing: ${missing.join(", ")}` : unknown.length ? `Couldn't confirm from the specs: ${unknown.join(", ")}` : "Meets every requirement",
+    detail: missing.length
+      ? `The human required ${m.item.mustHave.join(", ")}; the listing's title and specs don't show ${missing.join(", ")}.`
+      : unknown.length
+        ? `The title and structured specs don't state ${unknown.join(", ")}.`
+        : `Matched ${m.item.mustHave.join(", ") || "no explicit requirements"}.`,
+    data: { required: m.item.mustHave.join(", "), missing: missing.join(", "), unconfirmed: unknown.join(", ") },
   });
 
   // Merchant identity
