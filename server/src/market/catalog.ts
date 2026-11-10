@@ -108,3 +108,16 @@ export function substituteFor(productId: string | undefined): { title: string; a
   const l = listingsFor(alt)[0]!;
   return { title: l.title, attributes: l.attributes ?? {} };
 }
+
+/** Listings handed to external agents, so a later purchase can reference one by id. */
+const listingCache = new Map<string, Listing>();
+export async function searchListings(query: string, maxPrice?: number): Promise<{ listings: Listing[]; source: "channel3" | "fixture"; ms: number }> {
+  const r = await search(query, { maxPrice, limit: 5 });
+  const listings = r.products.flatMap((p) => listingsFor(p).slice(0, 3)).slice(0, 10);
+  for (const l of listings) listingCache.set(l.id, l);
+  if (listingCache.size > 2000) for (const k of [...listingCache.keys()].slice(0, 500)) listingCache.delete(k);
+  return { listings, source: r.source, ms: r.ms };
+}
+export function cachedListing(id: string): Listing | undefined {
+  return listingCache.get(id);
+}

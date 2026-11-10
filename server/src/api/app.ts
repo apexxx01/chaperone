@@ -3,11 +3,11 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { capabilities, config } from "../config.ts";
-import type { DeliveryReport } from "../domain/types.ts";
+import type { DeliveryReport, Listing, PurchaseIntent } from "../domain/types.ts";
 import { draftMandate, mandateFromDraft } from "../agent/mandate.ts";
 import { runShopper } from "../agent/shopper.ts";
 import { Chaperone, LifecycleError, explain } from "../lifecycle/service.ts";
-import { registry, substituteFor } from "../market/catalog.ts";
+import { cachedListing, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import { ATTACKS } from "../redteam/attacks.ts";
@@ -151,6 +151,42 @@ export function createApp(store: Store, paypal: PayPalApi) {
   });
 
   // ── Purchases ─────────────────────────────────────────────────
+  // For any outside agent (the MCP server uses these). Everything an agent sends is untrusted.
+  app.get("/api/search", async (c) => {
+    const q = z.object({ q: z.string().min(2).max(120), max_price: z.coerce.number().positive().optional() }).parse({ q: c.req.query("q"), max_price: c.req.query("max_price") });
+    const r = await searchListings(q.q, q.max_price);
+    return c.json({ source: r.source, ms: Math.round(r.ms), results: r.listings.map((l) => ({ listing_id: l.id, title: l.title, seller: l.merchant.domain, price: l.price, brand: l.brand ?? null, attributes: l.attributes ?? {}, page: l.pageText.slice(0, 1200) })) });
+  });
+
+  app.post("/api/purchases", async (c) => {
+    const b = z
+      .object({
+        mandateId: z.string(),
+        agent: z.string().min(1).max(60).default("external-agent"),
+        quantity: z.number().int().min(1).max(100).default(1),
+        reason: z.string().max(600).default(""),
+        note: z.string().max(300).optional(),
+        listingId: z.string().max(200).optional(),
+        listing: z
+          .object({ url: z.string().url().max(500), title: z.string().min(2).max(300), price: z.number().positive().max(100000), sellerDomain: z.string().min(3).max(120), payTo: z.string().email().optional(), pageText: z.string().max(20000).default(""), attributes: z.record(z.string(), z.string()).optional(), productId: z.string().max(120).optional() })
+          .optional(),
+      })
+      .refine((v) => v.listingId || v.listing, { message: "Provide listingId (from search) or listing" })
+      .parse(await c.req.json());
+    const mandate = chaperone.mandate(b.mandateId);
+    let listing: Listing | undefined = b.listingId ? cachedListing(b.listingId) : undefined;
+    if (b.listingId && !listing) throw new LifecycleError(`Unknown listingId ${b.listingId}; search again`, 404);
+    if (!listing && b.listing) {
+      const m = merchantFor(b.listing.sellerDomain);
+      listing = { id: `ext:${crypto.randomUUID().slice(0, 8)}`, url: b.listing.url, title: b.listing.title, merchant: { ...m, payoutEmail: b.listing.payTo ?? m.payoutEmail }, price: Math.round(b.listing.price * 100) / 100, currency: "USD", productId: b.listing.productId, pageText: b.listing.pageText, attributes: b.listing.attributes };
+    }
+    const intent: PurchaseIntent = { id: `pi_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, mandateId: mandate.id, agent: b.agent, createdAt: new Date().toISOString(), listing: listing!, quantity: b.quantity, agentRationale: b.reason, note: b.note };
+    const p = await chaperone.propose(intent);
+    return c.json({ purchase: p }, 201);
+  });
+
+  app.get("/api/purchases/:id", (c) => c.json({ purchase: chaperone.purchase(c.req.param("id")) }));
+
   app.post("/api/purchases/:id/decision", async (c) => {
     const b = z.object({ decision: z.enum(["approve", "deny"]), reason: z.string().max(200).optional() }).parse(await c.req.json());
     return c.json({ purchase: await chaperone.decide(c.req.param("id"), b.decision, b.reason) });

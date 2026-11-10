@@ -18,7 +18,9 @@
     "demo": "npm run demo -w server",
     "redteam": "npm run redteam -w server",
     "hijack": "npm run hijack -w server",
-    "loop": "npm run loop -w server"
+    "loop": "npm run loop -w server",
+    "mcp": "npm run mcp -w server",
+    "mcp:smoke": "npm run mcp:smoke -w server"
   },
   "engines": {
     "node": ">=22.13"

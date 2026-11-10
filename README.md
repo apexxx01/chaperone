@@ -3,7 +3,7 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-91%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-94%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
@@ -39,6 +39,31 @@ npm ci && npm run build -w web && npm start      # http://localhost:8787
 ```
 
 Approve a mandate with your **sandbox personal (buyer) account** from the Developer Dashboard → Testing Tools → Sandbox Accounts. If your sandbox app doesn't have "Save payment methods" enabled, set `PAYPAL_PAYMENT_MODE=card` to authorize with PayPal's published sandbox test card instead.
+
+## Plug it into any agent (MCP)
+
+Chaperone ships as an MCP server. Give an agent these tools **instead of** raw PayPal tools: it can shop, but it can't move money.
+
+```json
+{
+  "mcpServers": {
+    "chaperone": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/chaperone/server/src/mcp/server.ts"],
+      "env": { "CHAPERONE_URL": "http://localhost:8787" }
+    }
+  }
+}
+```
+
+| Tool | What the agent can do |
+|---|---|
+| `list_mandates` | See the jobs you signed and what budget is left |
+| `search_products` | Search real offers across retailers (Channel3) |
+| `propose_purchase` | Ask to buy. Gate runs; on pass, PayPal **holds** the funds |
+| `purchase_status` | See whether it was blocked, is waiting for you, held, paid or voided |
+
+There is deliberately no tool to approve a held purchase, confirm delivery, or edit a mandate. Those stay with the human in the console. `npm run mcp:smoke` drives the server with a real MCP client: an honest purchase is held, a hijacked one is blocked.
 
 ## Receipts
 
@@ -90,6 +115,7 @@ server/src/paypal/      client.ts (sandbox REST) · simulated.ts (offline, same 
 server/src/agent/       shopper.ts (Gemini agent) · mandate.ts · gemini.ts
 server/src/market/      channel3.ts · catalog.ts (registry, market median)
 server/src/redteam/     attacks.ts · runner.ts · cli.ts · hijack.ts
+server/src/mcp/         server.ts (MCP server for any agent) · smoke.ts
 web/src/                console (React + Vite)
 ```
 
