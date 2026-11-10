@@ -38,28 +38,33 @@ export function normalizeReq(s: string): string {
   return s.toLowerCase().normalize("NFKC").replace(/[\s\-_]+/g, "").replace(/watts?$/, "w");
 }
 
+const UNITS = new Set(["w", "watt", "watts", "mah", "wh", "v", "a", "gb", "tb", "mb", "hz", "khz", "in", "inch", "mm", "cm", "m", "ft", "kg", "g", "lb", "lbs", "oz", "ml", "l", "mp", "db", "nits", "ppi", "fps", "rpm"]);
+
 export type SpecStatus = "met" | "missing" | "contradicted" | "unknown";
 
 const NEGATIVE = /^(no|none|false|n|0|not included|without|n\/a)$/i;
 
 /**
  * Requirement check that trusts structured attributes over marketing copy.
- *  - Numeric specs ("65W"): must be stated. If an attribute gives a value in that unit ("wattage: 30W"),
- *    it decides, whatever the title claims ("65W-Compatible"). Never "unknown": absent means missing.
+ *  - Numeric specs ("65W"): if a spec field gives a value in that unit ("wattage: 30W"), it decides, whatever
+ *    the title claims ("65W-Compatible"). If nothing structured states it, "unknown".
  *  - Feature specs ("noise-cancelling"): met when stated, contradicted when an attribute says no or the
  *    only mentions are negated, otherwise "unknown" and left for the quarantined reader to confirm.
  */
 export function specStatus(requirement: string, title: string, attributes: Record<string, string> = {}): SpecStatus {
-  const num = /^(\d+(?:\.\d+)?)\s*([a-z]+)$/i.exec(requirement.trim());
+  const m0 = /^(\d+(?:\.\d+)?)\s*([a-z]+)$/i.exec(requirement.trim());
+  // Only real units make a measurement; "67XL" is a model number and is matched exactly below.
+  const num = m0 && UNITS.has(m0[2]!.toLowerCase()) ? m0 : null;
   if (num) {
     const unit = num[2]!.toLowerCase();
     const specVals = Object.values(attributes).filter((v) => new RegExp(`\\d\\s*${unit}\\b`, "i").test(v.replace(/watts?/gi, "w")));
     if (specVals.length) return specVals.some((v) => satisfies(requirement, v)) ? "met" : "contradicted";
-    // Qualifiers that mean "not actually": "65W-compatible", "up to 65W", "for 65W laptops"
+    // Qualifiers that mean "not actually this": "65W-compatible", "65W replacement". ("Up to 65W" is a real rating.)
     const t = title.toLowerCase().replace(/watts?/g, "w");
-    const qualified = new RegExp(`(up to|for|supports?)\\s*${num[1]}\\s*${unit}|${num[1]}\\s*${unit}[-\\s]*(compatible|ready|equivalent|replacement)`, "i").test(t);
+    const qualified = new RegExp(`${num[1]}\\s*${unit}[-\\s]*(compatible|ready|equivalent|replacement)`, "i").test(t);
     if (qualified) return "contradicted";
-    return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | ")) ? "met" : "missing";
+    // Not stated in the title or specs: left for the quarantined reader to confirm from the description.
+    return satisfies(requirement, [title, ...Object.entries(attributes).map(([k, v]) => `${k} ${v}`)].join(" | ")) ? "met" : "unknown";
   }
   // Model-style tokens with digits ("67XL") are exact: stated or missing.
   if (/\d/.test(requirement)) return satisfies(requirement, [title, ...Object.values(attributes)].join(" | ")) ? "met" : "missing";

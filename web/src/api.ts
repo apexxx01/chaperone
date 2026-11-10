@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Mandate, Purchase } from "../../server/src/domain/types.ts";
 import type { AgentRun } from "../../server/src/store/store.ts";
 import type { CaseResult, RedteamReport } from "../../server/src/redteam/runner.ts";
+import type { Duel } from "../../server/src/arena/duel.ts";
+export type { Duel };
 
 export type { Mandate, Purchase, AgentRun, CaseResult, RedteamReport };
 export type { Check, PurchaseState } from "../../server/src/domain/types.ts";
@@ -22,6 +24,8 @@ export interface AppState {
   purchases: Purchase[];
   runs: AgentRun[];
   redteam: RedteamReport | null;
+  duels: Duel[];
+  arena: { stats: { duels: number; aloneRobbed: number; aloneLost: number; gateBypassed: number; capturedThroughChaperone: number; custom: number }; attacks: { id: string; name: string; technique: string }[] };
   attacks: { id: string; name: string; technique: string; task: string; goal: string }[];
   tasks: { id: string; instruction: string }[];
   sellers: number;
@@ -72,6 +76,11 @@ export function useLive() {
       es.addEventListener("purchase", patch((s, d) => ({ ...s, purchases: upsert(s.purchases, d.payload, (p) => p.intent.createdAt) })));
       es.addEventListener("mandate", patch((s, d) => ({ ...s, mandates: upsert(s.mandates, d.payload, (m) => m.createdAt) })));
       es.addEventListener("agent", patch((s, d) => ({ ...s, runs: upsert(s.runs, d.payload, (r) => r.startedAt) })));
+      es.addEventListener("duel", (ev: MessageEvent) => {
+        const d = JSON.parse(ev.data).payload as Duel;
+        setState((s) => (s ? { ...s, duels: upsert(s.duels, d, (x) => x.at) } : s));
+        if (d.status !== "running") void refresh();
+      });
       es.addEventListener("reset", () => void refresh());
       es.addEventListener("redteam", (ev: MessageEvent) => {
         const d = JSON.parse(ev.data).payload;

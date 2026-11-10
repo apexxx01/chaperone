@@ -4,7 +4,7 @@ import { EventEmitter } from "node:events";
 import type { AgentStep, Mandate, Purchase } from "../domain/types.ts";
 
 export interface StoreEvent {
-  type: "purchase" | "mandate" | "agent" | "redteam" | "reset";
+  type: "purchase" | "mandate" | "agent" | "redteam" | "duel" | "reset";
   id?: string;
   at: string;
   payload?: unknown;
@@ -19,7 +19,7 @@ export interface AgentRun {
   steps: AgentStep[];
   purchaseIds: string[];
   /** What the agent actually tried to buy (both modes). */
-  buys?: { listingId: string; quantity: number; amount: number; outcome: string }[];
+  buys?: { seller?: string; listingId: string; quantity: number; amount: number; outcome: string }[];
   status: "running" | "done" | "error";
   error?: string;
 }
@@ -29,6 +29,7 @@ interface Snapshot {
   purchases: Purchase[];
   runs: AgentRun[];
   redteam: unknown[];
+  duels?: unknown[];
 }
 
 /** Small, durable, boring: in-memory maps + an atomic JSON snapshot. */
@@ -37,6 +38,7 @@ export class Store {
   purchases = new Map<string, Purchase>();
   runs = new Map<string, AgentRun>();
   redteam: unknown[] = [];
+  duels = new Map<string, { id: string; at: string }>();
   readonly events = new EventEmitter();
   private file?: string;
   private timer?: NodeJS.Timeout;
@@ -53,6 +55,7 @@ export class Store {
         s.purchases?.forEach((p) => this.purchases.set(p.id, p));
         s.runs?.forEach((r) => this.runs.set(r.id, r));
         this.redteam = s.redteam ?? [];
+        (s.duels as { id: string; at: string }[] | undefined)?.forEach((d) => this.duels.set(d.id, d));
       } catch {
         /* corrupt snapshot: start fresh rather than crash */
       }
@@ -68,7 +71,7 @@ export class Store {
     if (!this.file) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
-      const snap: Snapshot = { mandates: [...this.mandates.values()], purchases: [...this.purchases.values()], runs: [...this.runs.values()].slice(-50), redteam: this.redteam.slice(-10) };
+      const snap: Snapshot = { mandates: [...this.mandates.values()], purchases: [...this.purchases.values()], runs: [...this.runs.values()].slice(-50), redteam: this.redteam.slice(-10), duels: [...this.duels.values()].slice(-200) };
       const tmp = `${this.file}.tmp`;
       writeFileSync(tmp, JSON.stringify(snap));
       renameSync(tmp, this.file!);
@@ -100,6 +103,7 @@ export class Store {
     this.purchases.clear();
     this.runs.clear();
     this.redteam = [];
+    this.duels.clear();
     this.emit({ type: "reset" });
   }
 }

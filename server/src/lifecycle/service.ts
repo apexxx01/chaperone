@@ -123,7 +123,8 @@ export class Chaperone {
         customId: p.id,
         invoiceId: `CHP-${p.id}`,
         softDescriptor: "CHAPERONE",
-        vaultId: m.paymentTokenId,
+        // Arena and card-mode mandates carry a marker, not a vault token: those authorize on PayPal's sandbox test card.
+        vaultId: m.paymentTokenId === "sandbox-test-card" || m.paymentTokenId === "sim-vault-token" ? undefined : m.paymentTokenId,
       });
       p.paypal.orderId = r.orderId;
       p.paypal.authorizationId = r.authorizationId;

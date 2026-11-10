@@ -2,16 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { api, useLive } from "./api.ts";
 import { Drawer, Logo } from "./components.tsx";
 import { HowView, MandatesView, NowView, RedTeamView } from "./views.tsx";
+import { ArenaView } from "./arena.tsx";
 
 const TABS = [
-  { id: "now", label: "Now", key: "1" },
-  { id: "mandates", label: "Mandates", key: "2" },
-  { id: "redteam", label: "Red team", key: "3" },
-  { id: "how", label: "How it works", key: "4" },
+  { id: "arena", label: "Arena", key: "1" },
+  { id: "now", label: "Your agent", key: "2" },
+  { id: "mandates", label: "Mandates", key: "3" },
+  { id: "redteam", label: "Red team", key: "4" },
+  { id: "how", label: "How it works", key: "5" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
 const TOUR = [
+  { t: "Start in the Arena", d: "Pick an attack or write your own. One real agent shops twice: alone, and through Chaperone. Watch where the money goes." },
   { t: "Say what you want", d: "Type a request like “one 65W USB-C charger under $50”. Chaperone turns it into hard limits you approve once in PayPal." },
   { t: "Let the agent shop", d: "The Gemini agent searches real products on Channel3 and proposes a purchase. Plant an attack to see it get fooled." },
   { t: "Watch the money", d: "Each purchase is a lane. The coin shows where your money is: held in PayPal, paid to the seller, or stopped." },
@@ -20,7 +23,7 @@ const TOUR = [
 
 export function App() {
   const { state, connected, error, liveCases, redteamRunning, setRedteamRunning, setLiveCases } = useLive();
-  const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || "now");
+  const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || "arena");
   const [openId, setOpenId] = useState<string | undefined>();
   const [toast, setToast] = useState<{ m: string; err?: boolean } | null>(null);
   const [help, setHelp] = useState(false);
@@ -155,6 +158,7 @@ export function App() {
       {caps.mode === "offline" && <div className="banner">Offline demo: payments go to a PayPal simulator with the same rules, and the AI runs on local heuristics. Add sandbox keys to run it for real.</div>}
 
       <main>
+        {tab === "arena" && <ArenaView s={state} notify={notify} open={setOpenId} />}
         {tab === "now" && <NowView s={state} open={setOpenId} openId={openId} notify={notify} goto={(t) => setTab(t as Tab)} />}
         {tab === "mandates" && <MandatesView s={state} notify={notify} />}
         {tab === "redteam" && <RedTeamView s={state} live={liveCases} running={redteamRunning} start={startRedteam} />}
@@ -174,7 +178,7 @@ export function App() {
           <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Keyboard shortcuts">
             <h2>Shortcuts</h2>
             <dl>
-              <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Switch section</dd>
+              <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Switch section</dd>
               <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next / previous purchase</dd>
               <dt><kbd>a</kbd></dt><dd>Approve the purchase that needs you</dd>
               <dt><kbd>d</kbd></dt><dd>Decline it</dd>

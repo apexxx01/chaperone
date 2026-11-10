@@ -55,11 +55,15 @@ export function listingsFor(p: C3Product): Listing[] {
         brand: p.brands?.[0]?.name,
         imageUrl: p.images?.find((im) => im.is_main_image)?.url ?? p.images?.[0]?.url,
         pageText: productText(p),
-        attributes: Object.fromEntries(
-          Object.entries(p.structured_attributes ?? {})
-            .filter(([k]) => !k.startsWith("__"))
-            .map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)]),
-        ),
+        attributes: {
+          ...Object.fromEntries(
+            Object.entries(p.structured_attributes ?? {})
+              .filter(([k]) => !k.startsWith("__"))
+              .map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)]),
+          ),
+          // The catalog's own bullet list is structured data too ("Up to 65W USB Type-C Power Delivery").
+          ...(p.key_features?.length ? { "key-features": p.key_features.join("; ").slice(0, 600) } : {}),
+        },
         _rank: i,
       } as Listing;
     });

@@ -333,3 +333,41 @@ textarea.input { resize: vertical; min-height: 64px; }
   .doc { padding: var(--s5); }
   .msg { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* ── Arena ─────────────────────────────────────────── */
+.score { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-top: var(--s5); border-radius: 14px; overflow: hidden; }
+.score > div { background: var(--surface); padding: var(--s3) var(--s4); display: grid; gap: 2px; }
+.score b { font: 800 26px/1.1 var(--display); letter-spacing: -0.02em; }
+.score span { font-size: 13px; color: var(--ink-2); }
+.score .bad b { color: var(--signal); }
+.score .good b { color: var(--moss); }
+@media (max-width: 860px) { .score { grid-template-columns: repeat(2, 1fr); } }
+.forge { margin-top: var(--s5); display: grid; gap: var(--s4); }
+.forge-top { display: flex; gap: var(--s3); flex-wrap: wrap; justify-content: space-between; }
+.forge-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s5); }
+@media (max-width: 860px) { .forge-grid { grid-template-columns: 1fr; } }
+.forge-opts { display: grid; gap: var(--s3); align-content: start; }
+.tick { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.tick input { width: 16px; height: 16px; accent-color: var(--vault); }
+.btn.big { padding: 13px 26px; font-size: 16px; }
+.planted { background: var(--surface); border-radius: 14px; overflow: hidden; border: 1px dashed var(--signal); }
+.planted-head { display: grid; gap: 2px; padding: var(--s4) var(--s4) var(--s2); }
+.planted .tagline { font-size: 13px; color: var(--signal); font-weight: 600; }
+.planted pre { margin: 0; padding: var(--s3) var(--s4) var(--s4); white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.5 var(--text); color: var(--ink-2); max-height: 150px; overflow: auto; }
+.duel { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); margin-top: var(--s4); }
+@media (max-width: 860px) { .duel { grid-template-columns: 1fr; } }
+.side { background: var(--surface); border-radius: 18px; padding: var(--s5); display: grid; gap: var(--s4); align-content: start; }
+.side.alone { box-shadow: inset 0 4px 0 var(--signal); }
+.side.guarded { box-shadow: inset 0 4px 0 var(--vault); }
+.side-head { display: grid; gap: 2px; }
+.side-head span { font-size: 14px; }
+.stamp { display: grid; gap: 4px; padding: var(--s4); border-radius: 12px; background: var(--sunk); min-height: 104px; align-content: center; }
+.stamp .big { font: 800 clamp(32px, 4.6vw, 52px)/1 var(--display); letter-spacing: -0.03em; }
+.stamp .small { font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
+.stamp.bad { background: var(--signal-soft); }
+.stamp.bad .big { color: var(--signal); }
+.stamp.good { background: var(--moss-soft); }
+.stamp.good .big { color: var(--moss); }
+.stamp.wait .big { color: var(--ink-3); animation: pulse-ink 1.2s ease-in-out infinite; }
+@keyframes pulse-ink { 50% { opacity: .35; } }
+.side .feed { margin-top: 0; max-height: 300px; }

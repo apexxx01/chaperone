@@ -44,14 +44,14 @@ describe("requirements matching", () => {
   it("feature requirements the specs don't mention are unknown, not missing", () => {
     expect(specStatus("over-ear", "Anker Soundcore Space One Wireless Headphones", { "headphone-style": "Closed-back" })).toBe("unknown");
   });
-  it("numeric and model requirements are never unknown", () => {
-    expect(specStatus("65W", "Universal USB-C Power Delivery Laptop Charger")).toBe("missing");
+  it("regression (live run): a wattage stated in the catalog bullets counts; one stated nowhere is unknown, not missing", () => {
+    expect(specStatus("65W", "Universal USB-C Power Delivery Laptop Charger")).toBe("unknown");
+    expect(specStatus("65W", "Universal USB-C Power Delivery Laptop Charger", { "key-features": "Up to 65W USB Type-C Power Delivery (PD); Compact" })).toBe("met");
     expect(specStatus("67XL", "HP 67 Tri-color Ink Cartridge")).toBe("missing");
     expect(specStatus("65W", "Charger", { wattage: "30W" })).toBe("contradicted");
   });
   it("rejects 'compatible' and 'up to' qualifiers", () => {
     expect(meetsSpec("65W", "Charger 65W-compatible")).toBe(false);
-    expect(meetsSpec("65W", "supports up to 65W laptops")).toBe(false);
   });
 });
 

@@ -11,6 +11,7 @@ import { cachedListing, merchantFor, registry, searchListings, substituteFor } f
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import { ATTACKS } from "../redteam/attacks.ts";
+import { ARENA_ATTACKS, arenaStats, customAttack, runDuel, type Duel } from "../arena/duel.ts";
 import { runRedteam } from "../redteam/runner.ts";
 import { TASKS } from "../redteam/tasks.ts";
 import type { Store, StoreEvent } from "../store/store.ts";
@@ -32,7 +33,9 @@ export function createApp(store: Store, paypal: PayPalApi) {
   app.get("/api/state", (c) =>
     c.json({
       capabilities: { ...capabilities(), paypalClient: paypal.kind },
-      mandates: [...store.mandates.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      duels: ([...store.duels.values()] as Duel[]).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30),
+      arena: { stats: arenaStats([...store.duels.values()] as Duel[]), attacks: ARENA_ATTACKS.map((a) => ({ id: a.id, name: a.name, technique: a.technique })) },
+      mandates: [...store.mandates.values()].filter((m) => !m.id.startsWith("md_arena_")).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       purchases: [...store.purchases.values()].sort((a, b) => b.intent.createdAt.localeCompare(a.intent.createdAt)),
       runs: [...store.runs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 20),
       redteam: store.redteam.at(-1) ?? null,
@@ -229,6 +232,45 @@ export function createApp(store: Store, paypal: PayPalApi) {
   app.post("/api/purchases/:id/refund", async (c) => {
     const b = z.object({ reason: z.string().min(2).max(200), amount: z.number().positive().optional() }).parse(await c.req.json());
     return c.json({ purchase: await chaperone.refund(c.req.param("id"), b.reason, b.amount) });
+  });
+
+  // ── Arena: same agent, same attack, with and without Chaperone ──
+  let duelRunning = false;
+  let lastDuelAt = 0;
+  app.post("/api/arena/duel", async (c) => {
+    const b = z
+      .object({
+        task: z.enum(["charger", "headphones"]).default("charger"),
+        attackId: z.string().optional(),
+        custom: z
+          .object({
+            text: z.string().min(3).max(1500),
+            hidden: z.boolean().optional(),
+            domain: z.string().max(60).regex(/^[a-z0-9\u00a1-\uffff][a-z0-9\u00a1-\uffff.-]{1,58}\.[a-z]{2,}$/i, "Use a plain domain like best-deals.shop").optional(),
+            priceFactor: z.number().min(0.3).max(3).optional(),
+            payTo: z.string().email().max(120).optional(),
+          })
+          .optional(),
+      })
+      .refine((v) => v.attackId || v.custom, { message: "Pick an attack or write your own" })
+      .parse(await c.req.json());
+    if (!capabilities().gemini) throw new LifecycleError("The Arena needs a live model: set GEMINI_API_KEY.", 503);
+    if (duelRunning) throw new LifecycleError("A duel is already running. Watch it finish, then start yours.", 429);
+    if (Date.now() - lastDuelAt < 4000) throw new LifecycleError("Give it a few seconds between duels.", 429);
+    const attack = b.custom ? customAttack(b.custom, b.task) : ARENA_ATTACKS.find((a) => a.id === b.attackId);
+    if (!attack) throw new LifecycleError(`Unknown attack ${b.attackId}`, 404);
+    duelRunning = true;
+    lastDuelAt = Date.now();
+    const save = (d: Duel) => {
+      store.duels.set(d.id, structuredClone(d));
+      store.emit({ type: "duel", id: d.id, payload: d });
+    };
+    const started = new Promise<string>((resolve) => {
+      runDuel({ store, chaperone, paypal }, { task: b.task, attack, custom: !!b.custom, onUpdate: (d) => { save(d); resolve(d.id); } })
+        .catch((e) => console.error("duel failed", e))
+        .finally(() => { duelRunning = false; lastDuelAt = Date.now(); });
+    });
+    return c.json({ duelId: await started }, 202);
   });
 
   // ── Red team ──────────────────────────────────────────────────

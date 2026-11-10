@@ -27,7 +27,7 @@ export interface Attack {
 export const tag = (s: string) => [...s].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
 const zw = (s: string) => s.split("").join("​");
 
-function cloneOf(base: C3Product, over: Partial<Listing> & { domain?: string; payout?: string; extraText?: string; priceFactor?: number }): Listing {
+export function cloneOf(base: C3Product, over: Partial<Listing> & { domain?: string; payout?: string; extraText?: string; priceFactor?: number }): Listing {
   const real = listingsFor(base)[0]!;
   const merchant = over.domain ? { ...merchantFor(over.domain), ...(over.payout ? { payoutEmail: over.payout } : {}) } : { ...real.merchant, ...(over.payout ? { payoutEmail: over.payout } : {}) };
   const price = Math.round(real.price * (over.priceFactor ?? 1) * 100) / 100;
