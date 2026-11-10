@@ -52,7 +52,8 @@ export async function draftMandate(instruction: string): Promise<{ draft: Mandat
       system: `Extract a purchase mandate from a user's shopping instruction. Be conservative.
 - mustHave: hard, checkable specs the user named (e.g. "65W", "USB-C", "67XL", "noise cancel"). Short tokens. No adjectives like "good".
 - maxQuantity: the number of units the user asked for (default 1).
-- maxPerPurchase/maxTotal: the user's stated budget in USD; if none, estimate a sensible cap for the item.
+- maxTotal: the user's stated budget in USD for the whole job; if none, estimate a sensible cap.
+- maxPerPurchase: the most a single order (all units together) may cost. Unless the user gave a separate per-order limit, set it equal to maxTotal. Never divide the budget by the quantity.
 - description: 3-8 words naming the item.`,
       prompt: instruction,
       schema: SCHEMA,
@@ -65,14 +66,16 @@ export async function draftMandate(instruction: string): Promise<{ draft: Mandat
 
 export function mandateFromDraft(instruction: string, d: MandateDraft, extra: Partial<Pick<Mandate, "autoApproveUnder" | "maxOverMarketPct" | "expiresAt">> = {}): Mandate {
   const now = new Date();
+  // A model that split the budget per unit would make the user's own request unbuyable; one order may use the whole budget.
+  const perOrder = d.maxQuantity > 1 && d.maxPerPurchase * d.maxQuantity <= d.maxTotal + 0.01 ? d.maxTotal : d.maxPerPurchase;
   return {
     id: `md_${now.getTime().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     createdAt: now.toISOString(),
     expiresAt: extra.expiresAt ?? new Date(now.getTime() + 7 * 864e5).toISOString(),
     instruction,
     item: { description: d.description, mustHave: d.mustHave, category: d.category, maxQuantity: d.maxQuantity },
-    budget: { currency: "USD", maxPerPurchase: d.maxPerPurchase, maxTotal: Math.max(d.maxTotal, d.maxPerPurchase) },
-    autoApproveUnder: extra.autoApproveUnder ?? d.maxPerPurchase,
+    budget: { currency: "USD", maxPerPurchase: perOrder, maxTotal: Math.max(d.maxTotal, d.maxPerPurchase) },
+    autoApproveUnder: extra.autoApproveUnder ?? perOrder,
     maxOverMarketPct: extra.maxOverMarketPct ?? 20,
     merchants: { block: [] },
     status: "draft",

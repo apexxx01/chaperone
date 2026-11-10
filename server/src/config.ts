@@ -14,8 +14,8 @@ export const config = {
     webhookId: env.PAYPAL_WEBHOOK_ID ?? "",
   },
   geminiKey: env.GEMINI_API_KEY ?? "",
-  geminiModel: env.GEMINI_MODEL ?? "gemini-3.8-flash",
-  auditorModel: env.GEMINI_AUDITOR_MODEL ?? env.GEMINI_MODEL ?? "gemini-3.8-flash",
+  geminiModel: env.GEMINI_MODEL ?? "gemini-3.5-flash",
+  auditorModel: env.GEMINI_AUDITOR_MODEL ?? env.GEMINI_MODEL ?? "gemini-3.5-flash",
   channel3Key: env.CHANNEL3_API_KEY ?? "",
   dataDir: env.CHAPERONE_DATA_DIR ?? new URL("../data/", import.meta.url).pathname,
 };
