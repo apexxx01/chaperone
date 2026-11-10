@@ -113,8 +113,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
   const l = p.intent.listing;
   return (
     <>
-      <motion.div className="drawer-back" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-      <motion.aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
+      <motion.div className="drawer-back" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.16 } }} />
+      <motion.aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0, transition: { duration: 0.16 } }} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
         <div className="drawer-head">
           <div>
             <span className={`state ${p.state}`}>{coinFor(p).label}</span>
