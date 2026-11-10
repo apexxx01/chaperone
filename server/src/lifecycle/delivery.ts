@@ -6,7 +6,7 @@
 import { config } from "../config.ts";
 import type { Check, DeliveryReport, Mandate, Purchase, Verdict } from "../domain/types.ts";
 import { generateJson } from "../agent/gemini.ts";
-import { meetsSpec, round2 } from "../gate/policy.ts";
+import { meetsSpec, round2, specStatus, type SpecStatus } from "../gate/policy.ts";
 import { sanitize, scanText } from "../gate/scanner.ts";
 
 export type Settlement =
@@ -102,7 +102,18 @@ export async function verifyDelivery(mandate: Mandate, p: Purchase, d: DeliveryR
   const tj = performance.now();
   const { j, source } = await judge(`${ordered.title} ${Object.entries(ordered.attributes ?? {}).map(([k, v]) => `${k} ${v}`).join(" ")}`, deliveredText, mandate.item.mustHave);
   const jms = Math.round(performance.now() - tj);
-  const reqOk = mandate.item.mustHave.every((r) => d.manifest.some((m) => meetsSpec(r, m.title, m.attributes ?? {})));
+  // Per requirement, take the best status any manifest line gives it. "unknown" (the specs don't say)
+  // only passes when the same product arrived AND the gate already verified it at purchase time;
+  // missing or contradicted (e.g. "wattage: 30W" against 65W) always fails.
+  const rank: Record<SpecStatus, number> = { met: 3, unknown: 2, missing: 1, contradicted: 0 };
+  const gateVerified = p.verdict.checks.find((c) => c.rule === "policy.requirements")?.outcome === "pass";
+  const perReq = mandate.item.mustHave.map((r) => ({
+    r,
+    s: d.manifest.map((m) => specStatus(r, m.title, m.attributes ?? {})).sort((a, b) => rank[b] - rank[a])[0] ?? ("missing" as SpecStatus),
+  }));
+  const bad = perReq.filter((x) => x.s === "missing" || x.s === "contradicted").map((x) => x.r);
+  const unknown = perReq.filter((x) => x.s === "unknown").map((x) => x.r);
+  const reqOk = bad.length === 0 && (unknown.length === 0 || (j.sameProduct && gateVerified));
 
   checks.push({
     stage: "delivery",
@@ -116,10 +127,14 @@ export async function verifyDelivery(mandate: Mandate, p: Purchase, d: DeliveryR
   checks.push({
     stage: "delivery",
     rule: "delivery.requirements",
-    outcome: reqOk && j.meetsRequirements ? "pass" : "fail",
-    title: reqOk && j.meetsRequirements ? "Still meets your requirements" : "Doesn't meet your requirements",
-    detail: `Required ${mandate.item.mustHave.join(", ")}. Manifest: ${deliveredText.slice(0, 160)}.`,
-    data: { deterministic: reqOk, model: j.meetsRequirements, source },
+    outcome: reqOk && (j.meetsRequirements || unknown.length > 0) ? "pass" : "fail",
+    title: reqOk && (j.meetsRequirements || unknown.length > 0) ? "Still meets your requirements" : bad.length ? `Doesn't meet: ${bad.join(", ")}` : "Doesn't meet your requirements",
+    detail: bad.length
+      ? `Required ${mandate.item.mustHave.join(", ")}; what arrived doesn't have ${bad.join(", ")}.`
+      : unknown.length && reqOk
+        ? `Same product as ordered. ${unknown.join(", ")} isn't in the shipping specs, but was verified at purchase.`
+        : `Required ${mandate.item.mustHave.join(", ")}. Checked against what arrived.`,
+    data: { deterministic: reqOk, model: j.meetsRequirements, unverifiedAtDelivery: unknown.join(", "), source },
   });
   checks.push({
     stage: "delivery",

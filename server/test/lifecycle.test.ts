@@ -158,6 +158,21 @@ describe("requirements the specs don't state", () => {
     expect(p.state).toBe("awaiting_delivery");
     expect(p.verdict.checks.find((c) => c.rule === "policy.requirements")!.detail).toMatch(/quarantined reader/);
   });
+  it("regression (live run): the same product arriving isn't voided over a spec the shipping data omits", async () => {
+    setup();
+    const l = cans("Over-ear headphones with adaptive active noise cancelling.", { "headphone-style": "Closed-back", "noise-cancellation-technology": "Active noise cancellation (ANC)" });
+    const p = await ch.propose(intent({ listing: l }));
+    expect(p.state).toBe("awaiting_delivery");
+    const done = await ch.deliver(p.id, { source: "buyer", receivedAt: new Date().toISOString(), manifest: [{ title: l.title, quantity: 1, attributes: l.attributes }] });
+    expect(done.state).toBe("seller_paid");
+  });
+  it("a different product with the same blind spot is still voided", async () => {
+    setup();
+    const l = cans("Over-ear headphones with adaptive active noise cancelling.", { "noise-cancellation-technology": "Active noise cancellation (ANC)" });
+    const p = await ch.propose(intent({ listing: l }));
+    const done = await ch.deliver(p.id, { source: "buyer", receivedAt: new Date().toISOString(), manifest: [{ title: "Generic Wired Earbuds", quantity: 1, attributes: {} }] });
+    expect(done.state).toBe("voided");
+  });
   it("block when the description doesn't state them either", async () => {
     setup();
     const p = await ch.propose(intent({ listing: cans("Wireless headphones with 40 hour battery.") }));
