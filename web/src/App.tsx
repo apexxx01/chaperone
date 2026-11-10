@@ -131,7 +131,7 @@ export function App() {
     );
   }
   const caps = state.capabilities;
-  const heldCount = state.purchases.filter((p) => p.state === "held").length;
+  const heldCount = state.purchases.filter((p) => p.state === "held" && !/^md_(arena|rt)_/.test(p.intent.mandateId)).length;
   const open = state.purchases.find((p) => p.id === openId);
 
   return (

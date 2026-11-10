@@ -25,7 +25,8 @@ export function ArenaView({ s, notify, open }: { s: AppState; notify: Notify; op
   const [busy, setBusy] = useState(false);
   const [focus, setFocus] = useState<string | undefined>();
 
-  const duel = (focus ? s.duels.find((d) => d.id === focus) : undefined) ?? s.duels[0];
+  // Until the visitor picks or runs one, show a live duel if there is one, else the most recent where the agent was actually fooled.
+  const duel = (focus ? s.duels.find((d) => d.id === focus) : undefined) ?? s.duels.find((d) => d.status === "running") ?? s.duels.find((d) => d.verdict === "caught") ?? s.duels.find((d) => d.alone.fooled) ?? s.duels[0];
   const running = s.duels.some((d) => d.status === "running");
   useEffect(() => {
     if (running) setBusy(false);
