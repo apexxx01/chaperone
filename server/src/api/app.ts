@@ -7,6 +7,7 @@ import type { DeliveryReport, Listing, PurchaseIntent } from "../domain/types.ts
 import { draftMandate, mandateFromDraft } from "../agent/mandate.ts";
 import { runShopper } from "../agent/shopper.ts";
 import { Chaperone, LifecycleError, explain } from "../lifecycle/service.ts";
+import { appendEvent, verifyChain } from "../lifecycle/receipt.ts";
 import { cachedListing, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
@@ -188,6 +189,11 @@ export function createApp(store: Store, paypal: PayPalApi) {
     return c.json({ purchase: p }, 201);
   });
 
+  app.get("/api/purchases/:id/receipt", (c) => {
+    const p = chaperone.purchase(c.req.param("id"));
+    return c.json({ purchaseId: p.id, intentId: p.intent.id, createdAt: p.intent.createdAt, paypal: p.paypal, chain: verifyChain(p), timeline: p.timeline });
+  });
+
   app.get("/api/purchases/:id", (c) => c.json({ purchase: chaperone.purchase(c.req.param("id")) }));
 
   app.post("/api/purchases/:id/decision", async (c) => {
@@ -298,7 +304,7 @@ export function createApp(store: Store, paypal: PayPalApi) {
     const customId = body?.resource?.custom_id ?? body?.resource?.supplementary_data?.related_ids?.order_id;
     const p = customId ? store.purchases.get(customId) : undefined;
     if (p) {
-      p.timeline.push({ at: new Date().toISOString(), kind: "webhook", label: `PayPal webhook: ${body.event_type}`, detail: verified ? "signature verified" : "signature not verified (no PAYPAL_WEBHOOK_ID)" });
+      appendEvent(p, { at: new Date().toISOString(), kind: "webhook", label: `PayPal webhook: ${body.event_type}`, detail: verified ? "signature verified" : "signature not verified (no PAYPAL_WEBHOOK_ID)" });
       store.savePurchase(p);
     }
     return c.json({ received: true, verified });

@@ -10,7 +10,7 @@
  *                                            ├─ partial ─▶ partial capture (rest released) ─▶ payout
  *                                            └─ mismatch ─▶ void (money never moved)
  */
-import type { DeliveryReport, Mandate, Purchase, PurchaseIntent, TimelineEvent } from "../domain/types.ts";
+import type { DeliveryReport, Mandate, Purchase, PurchaseIntent } from "../domain/types.ts";
 import { runGate } from "../gate/pipeline.ts";
 import { round2 } from "../gate/policy.ts";
 import { marketForIntent, registry } from "../market/catalog.ts";
@@ -18,6 +18,7 @@ import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import type { Store } from "../store/store.ts";
 import { verifyDelivery, type ProofPhoto } from "./delivery.ts";
+import { appendEvent } from "./receipt.ts";
 
 const now = () => new Date().toISOString();
 
@@ -51,8 +52,7 @@ export class Chaperone {
   }
 
   private event(p: Purchase, kind: string, label: string, detail?: string, ms?: number) {
-    const e: TimelineEvent = { at: now(), kind, label, detail, ms: ms == null ? undefined : Math.round(ms) };
-    p.timeline.push(e);
+    appendEvent(p, { at: now(), kind, label, detail, ms: ms == null ? undefined : Math.round(ms) });
   }
 
   mandate(id: string): Mandate {

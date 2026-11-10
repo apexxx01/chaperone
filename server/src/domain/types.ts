@@ -171,6 +171,8 @@ export interface TimelineEvent {
   label: string;
   detail?: string;
   ms?: number;
+  /** SHA-256 over the previous event's hash and this event. Editing any past event breaks every hash after it. */
+  hash?: string;
 }
 
 export interface AgentStep {

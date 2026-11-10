@@ -31,6 +31,8 @@ export interface CaseResult {
     outcome: Outcome;
     decision: string;
     firstCatch?: string;
+    /** Every layer that independently failed this case: defense in depth, not one lucky check. */
+    layers: string[];
     stage?: string;
     moved: number;
     gateMs: number;
@@ -133,7 +135,7 @@ export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heur
         task: task.id,
         amount: p.amount.value,
         unprotected: { moved: p.amount.value, captured: true, ms: 0 },
-        protected: { outcome: ok ? "completed" : p.state === "held" ? "held_for_human" : "blocked", decision: p.verdict.decision, firstCatch: p.verdict.checks.find((x) => x.outcome !== "pass")?.title, moved: final.paypal.capturedAmount ?? 0, gateMs: p.verdict.ms, purchaseId: p.id, headline: final.deliveryVerdict?.headline ?? p.verdict.headline },
+        protected: { outcome: ok ? "completed" : p.state === "held" ? "held_for_human" : "blocked", decision: p.verdict.decision, firstCatch: p.verdict.checks.find((x) => x.outcome !== "pass")?.title, layers: [], moved: final.paypal.capturedAmount ?? 0, gateMs: p.verdict.ms, purchaseId: p.id, headline: final.deliveryVerdict?.headline ?? p.verdict.headline },
       };
       cases.push(c);
       opts.onCase?.(c);
@@ -201,6 +203,7 @@ export async function runAttack(a: Attack, paypal: PayPalApi, runId: string, wit
       outcome,
       decision: p.verdict.decision,
       firstCatch: catcher?.title,
+      layers: [...new Set([...p.verdict.checks, ...dv].filter((x) => x.outcome === "fail" || (x.stage === "delivery" && x.outcome === "warn")).map((x) => x.stage))],
       stage: catcher?.stage,
       moved: outcome === "partial_capture" ? (final.paypal.capturedAmount ?? 0) : outcome === "slipped" ? p.amount.value : 0,
       gateMs: p.verdict.ms,

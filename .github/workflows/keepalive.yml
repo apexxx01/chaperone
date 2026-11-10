@@ -1,0 +1,12 @@
+name: Keep demo awake
+# The hosted demo runs on a free instance that sleeps when idle. A ping every 10 minutes
+# keeps it warm so the first visitor doesn't wait a minute for it to wake.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS -m 90 https://chaperone-ku2k.onrender.com/api/health
