@@ -10,6 +10,15 @@ export interface GateDeps {
   now?: () => Date;
 }
 
+/** Fail closed, in plain words. The raw provider error stays in the server log. */
+function aiDownReason(e: unknown): string {
+  const msg = String((e as Error)?.message ?? e);
+  console.warn("AI layer unavailable:", msg.slice(0, 300));
+  if (/quota|429|RESOURCE_EXHAUSTED/i.test(msg)) return "The AI auditor is over its usage limit right now. Chaperone fails closed: instead of guessing, it asks you.";
+  if (/timed out|503|UNAVAILABLE|overloaded|high demand/i.test(msg)) return "The AI auditor didn't answer in time. Chaperone fails closed: instead of guessing, it asks you.";
+  return "The AI auditor couldn't be reached. Chaperone fails closed: instead of guessing, it asks you.";
+}
+
 const NO_FLAGS = { addressesAI: false, claimsApproval: false, requestsDifferentPayee: false, pushesQuantity: false, pressureTactics: false, asksToHideFromHuman: false, contradictsListingPrice: false };
 
 const SCAN_WEIGHT = { high: 35, medium: 15, low: 4 } as const;
@@ -116,7 +125,7 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
     ];
   } catch (e) {
     // Fail closed: if the AI layer is down, a human decides.
-    ai = [{ stage: "auditor", rule: "auditor.unavailable", outcome: "warn", title: "Auditor unavailable, routing to you", detail: String((e as Error).message).slice(0, 160) }];
+    ai = [{ stage: "auditor", rule: "auditor.unavailable", outcome: "warn", title: "Auditor unavailable, routing to you", detail: aiDownReason(e) }];
   }
 
   const checks = [...deterministic, ...scan, ...ai];

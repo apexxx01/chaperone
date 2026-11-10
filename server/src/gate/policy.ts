@@ -96,7 +96,9 @@ export function mentions(requirement: string, text: string): { positive: boolean
 }
 
 /** True when a requirement like "65W" or "USB-C" is satisfied by the product text. */
-export function satisfies(requirement: string, haystack: string): boolean {
+export function satisfies(requirement: string, rawHaystack: string): boolean {
+  // "20,000 mAh" and "20000mAh" are the same number.
+  const haystack = rawHaystack.replace(/(\d),(\d{3})/g, "$1$2");
   const req = normalizeReq(requirement);
   const hay = normalizeReq(haystack);
   // Numeric specs: "65W" is satisfied by "65 Watt", but NOT by "165W" or "6.5W".

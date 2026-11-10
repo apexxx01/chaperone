@@ -79,6 +79,16 @@ If anything indicates the agent was manipulated or drifted from the instruction,
  * @param confirm requirements the deterministic check could not find in the title/specs. The reader may
  *   confirm each one from the page text, as a boolean per requirement. Still no free text crosses over.
  */
+/** Identical inputs get the identical answer without another model call (repeat red-team runs, repeated listings). */
+const memo = new Map<string, unknown>();
+async function cached<T>(key: string, fn: () => Promise<T>): Promise<{ value: T; hit: boolean }> {
+  if (memo.has(key)) return { value: memo.get(key) as T, hit: true };
+  const value = await fn();
+  if (memo.size > 800) memo.delete(memo.keys().next().value!);
+  memo.set(key, value);
+  return { value, hit: false };
+}
+
 export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = []): Promise<{ flags: ReaderFlags; confirmed: boolean[]; source: "gemini" | "heuristic"; ms: number }> {
   const t0 = performance.now();
   // Seller-controlled text only. The agent's own rationale is scanned separately; mixing it in here made
@@ -92,7 +102,7 @@ export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = 
   const schema = confirm.length
     ? { ...READER_SCHEMA, properties: { ...READER_SCHEMA.properties, requirementStated: { type: "array", items: { type: "boolean" }, minItems: confirm.length, maxItems: confirm.length } }, required: [...FLAG_KEYS, "requirementStated"] }
     : READER_SCHEMA;
-  const flags = await generateJson<ReaderFlags & { requirementStated?: boolean[] }>({ model: config.readerModel, system: READER_SYSTEM, prompt, schema });
+  const { value: flags } = await cached(`reader|${prompt}`, () => generateJson<ReaderFlags & { requirementStated?: boolean[] }>({ model: config.readerModel, system: READER_SYSTEM, prompt, schema }));
   const confirmed = confirm.map((_, i) => flags.requirementStated?.[i] === true);
   // Enforce the boolean-only contract even if the model misbehaves.
   const clean = Object.fromEntries(FLAG_KEYS.map((k) => [k, flags[k] === true])) as unknown as ReaderFlags;
@@ -130,12 +140,15 @@ export async function audit(args: {
     page_manipulation_flags: raised,
     scanner_findings: args.findings.map((f) => `${f.severity} ${f.kind}`),
   };
-  const result = await generateJson<AuditResult>({
-    model: config.auditorModel,
-    system: AUDITOR_SYSTEM,
-    prompt: JSON.stringify(facts, null, 2),
-    schema: AUDIT_SCHEMA,
-  });
+  const { value } = await cached(`auditor|${JSON.stringify(facts)}`, () =>
+    generateJson<AuditResult>({
+      model: config.auditorModel,
+      system: AUDITOR_SYSTEM,
+      prompt: JSON.stringify(facts, null, 2),
+      schema: AUDIT_SCHEMA,
+    }),
+  );
+  const result = structuredClone(value);
   result.confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));
   result.concerns = (result.concerns ?? []).filter((c) => (CONCERNS as readonly string[]).includes(c) && c !== "none");
   result.summary = String(result.summary ?? "").slice(0, 240);

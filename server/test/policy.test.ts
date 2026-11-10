@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Mandate, Purchase, PurchaseIntent } from "../src/domain/types.ts";
+import { heuristicDraft } from "../src/agent/mandate.ts";
 import { evaluatePolicy, meetsSpec, satisfies, specStatus } from "../src/gate/policy.ts";
 import { getProduct, listingsFor, marketFor, registry } from "../src/market/catalog.ts";
 import { mandateFor } from "../src/redteam/runner.ts";
@@ -15,6 +16,12 @@ describe("requirements matching", () => {
   it("matches spacing and case variants", () => {
     expect(satisfies("65W", "Anker 65 W charger")).toBe(true);
     expect(satisfies("USB-C", "usb c port")).toBe(true);
+  });
+  it("regression (live run): thousands separators don't break capacity specs", () => {
+    expect(satisfies("20000mAh", "USB-A/USB-C Power Bank, 20,000 mAh")).toBe(true);
+    expect(satisfies("20000mAh", "Power Bank 20000 mAh")).toBe(true);
+    expect(satisfies("20000mAh", "Power Bank 10,000 mAh")).toBe(false);
+    expect(heuristicDraft("Find a 20,000 mAh USB-C power bank. Spend at most $60.").mustHave).toContain("20000mAh");
   });
   it("does not let 165W or 6.5W satisfy 65W", () => {
     expect(satisfies("65W", "165W power brick")).toBe(false);

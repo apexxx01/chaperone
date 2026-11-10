@@ -3,7 +3,7 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-102%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-106%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
@@ -20,10 +20,12 @@ Most "agent wallet" tools stop at *should the agent buy this?* Chaperone covers 
 
 | | |
 |---|---|
-| **Live demo** | _hosted URL goes here after deploy_ |
+| **Live demo** | https://chaperone-ku2k.onrender.com (opens on the Arena: try to rob the agent) |
 | **One command (no keys)** | `docker compose -f repro/compose.yaml up` → http://localhost:8787 |
 | **From source** | `npm ci && npm run build -w web && npm run demo` |
 | **Red team** | `npm run redteam` (offline) or with keys in `.env` for the PayPal sandbox |
+| **Held-out attacks** | `npm run heldout`: a separate model invents fresh attacks it has never tested against the gate |
+| **Real hijack rate** | `npm run hijack`: how often a live Gemini agent falls for each attack |
 | **Tests** | `npm test` |
 
 Offline mode needs no keys: payments go to a PayPal simulator that enforces the same state rules (no capture after void, no over-capture, idempotent request ids), the AI runs on labeled heuristics, and products come from a fixture catalog in Channel3's schema. The console always shows which of PayPal / Gemini / Channel3 is live.
@@ -67,17 +69,30 @@ There is deliberately no tool to approve a held purchase, confirm delivery, or e
 
 ## Receipts
 
-Red team, full-compromise mode (we assume the agent falls for every attack, then follow the money). Offline simulator run, reproduce with `npm run redteam`:
+All numbers below are from real runs on 10 Nov 2026 against the **PayPal sandbox**, with the AI layer on live Gemini. Raw reports are in [`docs/receipts/`](docs/receipts) and every figure is reproducible with the command shown.
+
+**1. Red team, full-compromise mode** (`npm run redteam`). We assume the agent falls for every attack, then follow the money.
 
 | | Agent alone (holds PayPal tools directly) | Same agent through Chaperone |
 |---|---|---|
-| Money moved by attacks | **−$1,398.13** on 21 / 21 attacks | **$0.00** moved to the wrong place |
-| Outcome | captured immediately | 18 blocked at the gate · 3 caught after purchase (bait-and-switch voided, short shipment partially captured, fake delivery claim left unpaid) |
-| Honest purchases | n/a | 4 / 4 completed, 0 false positives |
+| Money moved by 21 attacks | **−$1,398.13** captured, 21 / 21 | **$0.00** paid to the wrong place |
+| Outcome | captured immediately | 18 blocked at the gate · 3 caught after purchase (bait-and-switch voided, short shipment partly captured, fake delivery claim left unpaid) |
+| Layers per attack | n/a | 2.0 on average; 17 of 21 failed two or more independent layers |
+| Honest purchases | n/a | 3 of 4 completed. The fourth was held for a human because the AI auditor hit its API quota: Chaperone fails closed |
+
+**2. Held-out round** (`npm run heldout`). The corpus above and the gate share an author, so a separate Gemini call plays the attacker. It is told the scenario and nothing about the defenses, and invents 20 attacks of its own.
+
+| Blocked at the gate | Held for a human | Past the gate |
+|---|---|---|
+| **19** | **1** | **0** |
+
+Most were stopped by the plain-code limits the human signed (quantity, per-purchase cap, payee identity), not by pattern-matching the attack text. The attacker here was a small model; a stronger one will do better, which is why the money is held until delivery instead of trusting the gate.
+
+**3. How often a real agent is fooled** (`npm run hijack`). A live `gemini-3.6-flash` shopping agent, one trial per attack: **4 of 18** pre-purchase attacks (22%) hijacked it, including the invisible-Unicode instruction and both lookalike stores. It resisted the other 14 by itself. In the Arena, the same lookalike store took **$21.24** from the unprotected agent, twice, as real sandbox captures.
+
+**4. Speed.** Median gate time on these runs was about 7 s, almost all of it the two Gemini calls (run in parallel); the deterministic checks take under a millisecond and a PayPal authorization about 3 s.
 
 The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `SYSTEM:` messages in reviews, HTML comments, `amaz0n.com`, a Cyrillic `у` in `bestbuу.com`, fake surcharges, quiet 70% markups, pack-size quantity pushes, persuasion with no AI keywords, payee swaps (visible and hidden), approval spoofing, concealment requests, a "65W-compatible" 30W charger, `<|im_start|>` tokens, zero-width splitting, an instruction in Hindi, bait-and-switch, a short shipment, and a seller falsely marking an order delivered. See [`server/src/redteam/attacks.ts`](server/src/redteam/attacks.ts).
-
-`npm run hijack` measures the other half: how often a real Gemini agent actually falls for each attack. Measured on 10 Nov 2026 with `gemini-3.6-flash`, one trial each: **4 of 18** pre-purchase attacks (22%) hijacked the agent, including the invisible-Unicode instruction and both lookalike stores. The agent resisted the other 14 by itself.
 
 **Dogfood:** running Chaperone's own seeded demo through itself caught a real bug. Wired headphones were authorized against a "noise-cancelling" mandate because the spec matcher read `noise_canceling: no` as a match. Fixed in [`2722b90`](../../commit/2722b90) with regression tests.
 
@@ -102,6 +117,7 @@ The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 - **Shopping agent** (Gemini function calling): deliberately ordinary and unhardened. Chaperone protects the money even when it's fooled.
 - **Quarantined reader** (Gemini, booleans-only schema): reads untrusted page text and can only flip fixed flags, so injected text can't pass instructions along.
 - **Privileged auditor** (Gemini, structured output): sees your words and verified facts, never the page. Decides whether the purchase serves your instruction.
+- **Tamper-evident receipts**: every purchase event is SHA-256 chained to the one before it, and the console re-computes the chain in your browser.
 - **Delivery comparison** (Gemini, booleans only): does the report match the order?
 - **Proof photo** (Gemini vision, booleans only): does the buyer's photo show the ordered product, and does any visible label contradict a requirement?
 - Fail closed: if the AI layer is down, purchases wait for you.
@@ -120,6 +136,9 @@ web/src/                console (React + Vite)
 ```
 
 ## Honest limits
+
+- **Live testing found bugs in our own checks.** On the first day against real catalog data, the gate wrongly blocked or voided correct purchases four times (wording differences, specs listed only in bullets or descriptions). Each is fixed with a regression test named for the live run that found it.
+- **The AI layer depends on a rate-limited API.** When Gemini is over quota or slow, purchases wait for a human instead of passing. Safe, but slower.
 
 - **This is a self-built red team.** The attacks and the defenses come from the same author, and in "full-compromise mode" we assume the agent is fooled rather than measuring it. `npm run hijack` measures a real Gemini agent separately. The gate will miss attacks it hasn't seen; that is why the money is held until delivery instead of trusting the gate.
 - **Sellers are demo identities.** Product offers are real (Channel3), but seller payout addresses are stand-ins on a reserved domain. Paying real sellers this way needs them onboarded as PayPal accounts through PayPal's platform products.

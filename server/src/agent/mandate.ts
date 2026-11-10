@@ -37,7 +37,7 @@ export function heuristicDraft(instruction: string): MandateDraft {
   const money = [...t.matchAll(/\$\s?(\d+(?:\.\d{1,2})?)/g)].map((m) => Number(m[1]));
   const qtyM = /\b(\d{1,2}|one|two|three|four|five|six|ten|a pair of)\b\s+(?!w\b|watt)/.exec(t);
   const qty = qtyM ? (WORDS[qtyM[1]!.replace("a pair of", "pair")] ?? Number(qtyM[1]) ?? 1) : 1;
-  const specs = [...instruction.matchAll(/\b(\d+(?:\.\d+)?\s?(?:W|mAh|GB|TB|XL|in|inch))\b/gi)].map((m) => m[1]!.replace(/\s/g, ""));
+  const specs = [...instruction.matchAll(/(?<![\d,.])((?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(?:W|mAh|Wh|GB|TB|XL|inch|in))\b/gi)].map((m) => m[1]!.replace(/[\s,]/g, ""));
   const known = ["USB-C", "noise cancel", "over-ear", "wireless", "black", "waterproof"].filter((k) => t.includes(k.toLowerCase().replace("noise cancel", "noise-cancel")) || t.includes(k.toLowerCase()));
   const budget = money.length ? Math.max(...money) : 100;
   const cleaned = instruction.replace(/^(please\s+)?(buy|get|order|find)\s+(me\s+)?/i, "").replace(/[,.].*$/, "").replace(/^(one|a|an)\s+/i, "").trim();
@@ -58,7 +58,10 @@ export async function draftMandate(instruction: string): Promise<{ draft: Mandat
       prompt: instruction,
       schema: SCHEMA,
     });
-    return { draft: { ...d, mustHave: d.mustHave.slice(0, 5), maxQuantity: Math.max(1, Math.round(d.maxQuantity)) }, source: "gemini" };
+    // Drop "requirements" that just repeat what the item is ("charger" for a charger): they check nothing.
+    const noun = new Set(d.description.toLowerCase().split(/\W+/));
+    const mustHave = d.mustHave.map((r) => r.replace(/(\d),(\d{3})/g, "$1$2").trim()).filter((r) => r && !(noun.has(r.toLowerCase()) && !/[\d-]/.test(r)));
+    return { draft: { ...d, mustHave: mustHave.slice(0, 5), maxQuantity: Math.max(1, Math.round(d.maxQuantity)) }, source: "gemini" };
   } catch {
     return { draft: heuristicDraft(instruction), source: "heuristic" };
   }

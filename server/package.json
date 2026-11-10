@@ -14,7 +14,8 @@
     "hijack": "tsx --env-file-if-exists=../.env src/redteam/hijack.ts",
     "loop": "tsx --env-file-if-exists=../.env src/redteam/loop.ts",
     "mcp": "tsx src/mcp/server.ts",
-    "mcp:smoke": "tsx src/mcp/smoke.ts"
+    "mcp:smoke": "tsx src/mcp/smoke.ts",
+    "heldout": "tsx --env-file-if-exists=../.env src/redteam/heldout.ts"
   },
   "dependencies": {
     "@google/genai": "^3.0.0",

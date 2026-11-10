@@ -117,7 +117,7 @@ function moneySeries(purchases: Purchase[]) {
 function MoneyChart({ purchases }: { purchases: Purchase[] }) {
   const pts = useMemo(() => moneySeries(purchases), [purchases]);
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640, H = 220, L = 46, R = 96, T = 12, B = 26;
+  const W = 640, H = 220, L = 46, R = 132, T = 12, B = 26;
   if (pts.length < 2) return <p className="readout">Run a few purchases or duels and this fills in.</p>;
   const t0 = pts[0]!.t, t1 = pts.at(-1)!.t || t0 + 1;
   const max = Math.max(1, ...pts.map((p) => Math.max(p.held, p.paid, p.stopped)));
@@ -154,7 +154,7 @@ function MoneyChart({ purchases }: { purchases: Purchase[] }) {
           </g>
         ))}
         {series.map((s) => <path key={s.k} d={path(s.k)} className={`line ${s.cls}`} />)}
-        {ends.map((s) => <text key={s.k} x={W - R + 8} y={s.y + 4} className="endlabel">{s.name.split(" ")[0]} {usd(last[s.k]).replace(".00", "")}</text>)}
+        {ends.map((s) => <text key={s.k} x={W - R + 8} y={s.y + 4} className="endlabel">{s.name.split(" ")[0]} {`$${Math.round(last[s.k]).toLocaleString("en-US")}`}</text>)}
         {h && <line x1={x(h.t)} x2={x(h.t)} y1={T} y2={H - B} className="cross" />}
         <text x={L} y={H - 6} className="axis">{new Date(t0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</text>
         <text x={W - R} y={H - 6} textAnchor="end" className="axis">{new Date(t1).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</text>
@@ -222,7 +222,7 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
     e.fooled += (d.alone.fooled ? 1 : 0) + (d.guarded.fooled ? 1 : 0);
     byAttack.set(k, e);
   }
-  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: e.name, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} agent runs fell for it` }));
+  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: e.name, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} agent runs fell for it. Small sample` }));
 
   const blocked = ps.filter((p) => p.state === "blocked").length;
   const st = s.arena.stats;
