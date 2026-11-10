@@ -24,11 +24,11 @@ async function withRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
 }
 
 /** Structured output call: the model can only answer in this JSON shape. */
-export async function generateJson<T>(opts: { model: string; system: string; prompt: string; schema: object; temperature?: number }): Promise<T> {
+export async function generateJson<T>(opts: { model: string; system: string; prompt: string; schema: object; temperature?: number; image?: { mime: string; data: string } }): Promise<T> {
   const res = await withRetry(() =>
     gemini().models.generateContent({
       model: opts.model,
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      contents: [{ role: "user", parts: [...(opts.image ? [{ inlineData: { mimeType: opts.image.mime, data: opts.image.data } }] : []), { text: opts.prompt }] }],
       config: {
         systemInstruction: opts.system,
         responseMimeType: "application/json",

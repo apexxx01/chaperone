@@ -17,7 +17,7 @@ import { marketForIntent, registry } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import type { Store } from "../store/store.ts";
-import { verifyDelivery } from "./delivery.ts";
+import { verifyDelivery, type ProofPhoto } from "./delivery.ts";
 
 const now = () => new Date().toISOString();
 
@@ -162,7 +162,7 @@ export class Chaperone {
     });
   }
 
-  async deliver(purchaseId: string, report: DeliveryReport): Promise<Purchase> {
+  async deliver(purchaseId: string, report: DeliveryReport, photo?: ProofPhoto): Promise<Purchase> {
     const p0 = this.purchase(purchaseId);
     return this.withLock(p0.intent.mandateId, async () => {
       const p = this.purchase(purchaseId);
@@ -170,13 +170,19 @@ export class Chaperone {
       const m = this.mandate(p.intent.mandateId);
       p.state = "verifying";
       p.delivery = report;
-      this.event(p, "delivered", `Delivery reported${report.carrier ? ` (${report.carrier} ${report.trackingNumber ?? ""})` : ""}`, report.manifest.map((i) => `${i.quantity}× ${i.title}`).join(", "));
+      this.event(p, "delivered", `${report.source === "buyer" ? "You reported what arrived" : report.source === "seller" ? "Seller says it was delivered" : "Carrier scan"}${report.carrier ? ` (${report.carrier} ${report.trackingNumber ?? ""})` : ""}`, report.manifest.map((i) => `${i.quantity}× ${i.title}`).join(", "));
       this.store.savePurchase(p);
 
-      const { verdict, settlement } = await verifyDelivery(m, p, report);
+      const { verdict, settlement } = await verifyDelivery(m, p, report, photo);
       p.deliveryVerdict = verdict;
       this.event(p, "verified", "Delivery check", verdict.headline, verdict.ms);
 
+      if (settlement.action === "await_buyer") {
+        p.state = "awaiting_delivery";
+        this.event(p, "waiting", "Funds stay held: waiting for you to confirm", `${settlement.reason}. If nobody confirms, the authorization expires and the money is released back to you.`);
+        this.store.savePurchase(p);
+        return p;
+      }
       try {
         if (settlement.action === "void") {
           const t = performance.now();

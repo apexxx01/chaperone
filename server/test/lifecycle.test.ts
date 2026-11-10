@@ -12,7 +12,7 @@ let store: Store, pp: PayPalSimulated, ch: Chaperone;
 let n = 0;
 const listing = () => listingsFor(getProduct("fx-chg-anker-735")!).find((l) => l.merchant.domain === "amazon.com")!;
 const intent = (over: Partial<PurchaseIntent> = {}): PurchaseIntent => ({ id: `pi_${++n}`, mandateId: "md", agent: "t", createdAt: new Date().toISOString(), listing: listing(), quantity: 1, agentRationale: "best verified price", ...over });
-const delivered = (qty = 1, title = listing().title) => ({ receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: "1Z999AA10123456784", manifest: [{ title, quantity: qty, attributes: { wattage: "65W", connector: "USB-C" } }] });
+const delivered = (qty = 1, title = listing().title) => ({ source: "buyer" as const, receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: "1Z999AA10123456784", manifest: [{ title, quantity: qty, attributes: { wattage: "65W", connector: "USB-C" } }] });
 
 beforeEach(() => {
   store = new Store();
@@ -45,7 +45,7 @@ describe("purchase lifecycle", () => {
     const done = await ch.deliver(p.id, delivered());
     expect(done.state).toBe("seller_paid");
     expect(done.paypal.capturedAmount).toBe(39.99);
-    expect(pp.payouts[0]).toMatchObject({ receiver: "payouts@amazon.com", amount: 39.99 });
+    expect(pp.payouts[0]).toMatchObject({ receiver: "amazon-com@sellers.chaperone.example", amount: 39.99 });
     expect(done.timeline.map((e) => e.kind)).toEqual(expect.arrayContaining(["authorized", "captured", "tracked", "payout"]));
   });
   it("voids when a different item arrives: the money never moves", async () => {
@@ -54,6 +54,27 @@ describe("purchase lifecycle", () => {
     expect(done.state).toBe("voided");
     expect(pp.auths.get(p.paypal.authorizationId!)!.status).toBe("VOIDED");
     expect(pp.payouts).toHaveLength(0);
+  });
+  it("a seller's own 'delivered' claim never releases money; the buyer's confirmation does", async () => {
+    const p = await ch.propose(intent());
+    const claimed = await ch.deliver(p.id, { ...delivered(), source: "seller" });
+    expect(claimed.state).toBe("awaiting_delivery");
+    expect(pp.captures.size).toBe(0);
+    expect(pp.payouts).toHaveLength(0);
+    expect(claimed.deliveryVerdict!.checks.find((c) => c.rule === "delivery.evidence_source")!.outcome).toBe("warn");
+    const confirmed = await ch.deliver(p.id, delivered());
+    expect(confirmed.state).toBe("seller_paid");
+  });
+  it("a carrier scan alone doesn't release money either", async () => {
+    const p = await ch.propose(intent());
+    const scanned = await ch.deliver(p.id, { ...delivered(), source: "carrier" });
+    expect(scanned.state).toBe("awaiting_delivery");
+    expect(pp.captures.size).toBe(0);
+  });
+  it("a seller admitting a different item still voids", async () => {
+    const p = await ch.propose(intent());
+    const done = await ch.deliver(p.id, { source: "seller", receivedAt: new Date().toISOString(), manifest: [{ title: "30W USB-C Fast Charger Block", quantity: 1, attributes: { wattage: "30W" } }] });
+    expect(done.state).toBe("voided");
   });
   it("captures only what arrived on a short shipment", async () => {
     store.mandates.get("md")!.item.maxQuantity = 2;

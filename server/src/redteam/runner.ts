@@ -16,7 +16,7 @@ import { Store } from "../store/store.ts";
 import { ATTACKS, hijackedIntent, type Attack } from "./attacks.ts";
 import { TASKS, taskById, type Task } from "./tasks.ts";
 
-export type Outcome = "blocked" | "held_for_human" | "voided_after_delivery" | "partial_capture" | "slipped" | "completed";
+export type Outcome = "blocked" | "held_for_human" | "voided_after_delivery" | "partial_capture" | "held_until_confirmed" | "slipped" | "completed";
 
 export interface CaseResult {
   id: string;
@@ -97,7 +97,7 @@ async function unprotectedArm(paypal: PayPalApi, intent: PurchaseIntent, tag: st
 }
 
 function asDelivered(intent: PurchaseIntent): DeliveryReport {
-  return { receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: `1Z${Math.random().toString().slice(2, 16)}`, manifest: [{ title: intent.listing.title, quantity: intent.quantity, attributes: intent.listing.attributes }] };
+  return { source: "buyer", receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: `1Z${Math.random().toString().slice(2, 16)}`, manifest: [{ title: intent.listing.title, quantity: intent.quantity, attributes: intent.listing.attributes }] };
 }
 
 export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heuristic"; withUnprotected?: boolean; onCase?: (c: CaseResult) => void; only?: string[] }): Promise<RedteamReport> {
@@ -152,7 +152,7 @@ export async function runRedteam(opts: { paypal: PayPalApi; ai: "gemini" | "heur
       attacks: atk.length,
       stoppedAtGate: atk.filter((c) => c.protected.outcome === "blocked").length,
       heldForHuman: atk.filter((c) => c.protected.outcome === "held_for_human").length,
-      caughtAfterPurchase: atk.filter((c) => c.protected.outcome === "voided_after_delivery" || c.protected.outcome === "partial_capture").length,
+      caughtAfterPurchase: atk.filter((c) => c.protected.outcome === "voided_after_delivery" || c.protected.outcome === "partial_capture" || c.protected.outcome === "held_until_confirmed").length,
       slipped: atk.filter((c) => c.protected.outcome === "slipped").length,
       unprotectedDollarsMoved: round2(atk.reduce((s, c) => s + c.unprotected.moved, 0)),
       protectedDollarsMovedWrongly: round2(atk.reduce((s, c) => s + (c.protected.outcome === "slipped" ? c.protected.moved : 0), 0)),
@@ -183,7 +183,7 @@ export async function runAttack(a: Attack, paypal: PayPalApi, runId: string, wit
   else if (p.state === "held") outcome = "held_for_human";
   else if (p.state === "awaiting_delivery") {
     final = await ch.deliver(p.id, a.delivery ? a.delivery(listing, intent.quantity) : asDelivered(intent));
-    outcome = final.state === "voided" ? "voided_after_delivery" : (final.paypal.capturedAmount ?? 0) < p.amount.value - 0.001 ? "partial_capture" : "slipped";
+    outcome = final.state === "voided" ? "voided_after_delivery" : final.state === "awaiting_delivery" ? "held_until_confirmed" : (final.paypal.capturedAmount ?? 0) < p.amount.value - 0.001 ? "partial_capture" : "slipped";
   } else outcome = "blocked";
 
   const dv = final.deliveryVerdict?.checks ?? [];

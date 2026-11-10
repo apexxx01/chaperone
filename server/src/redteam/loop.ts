@@ -48,7 +48,7 @@ if (p.state !== "awaiting_delivery") {
   process.exit(0);
 }
 const td = performance.now();
-p = await ch.deliver(p.id, { receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: `1Z${Date.now()}`.slice(0, 18), manifest: [{ title: p.intent.listing.title, quantity: p.intent.quantity, attributes: p.intent.listing.attributes }] });
+p = await ch.deliver(p.id, { source: "buyer", receivedAt: new Date().toISOString(), carrier: "UPS", trackingNumber: `1Z${Date.now()}`.slice(0, 18), manifest: [{ title: p.intent.listing.title, quantity: p.intent.quantity, attributes: p.intent.listing.attributes }] });
 const tEnd = performance.now();
 console.log(`delivery → verify + capture + tracking + payout: ${((tEnd - td) / 1000).toFixed(1)} s  (${p.state})`);
 for (const e of p.timeline) console.log(`  ${e.kind.padEnd(10)} ${e.ms != null ? String(e.ms).padStart(6) + " ms" : "         "}  ${e.label}`);

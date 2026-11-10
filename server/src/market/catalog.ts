@@ -12,7 +12,9 @@ export const registry = new Map<string, Merchant>();
 export function merchantFor(domain: string): Merchant {
   const d = domain.toLowerCase().replace(/^www\./, "");
   const name = d.split(".")[0]!.replace(/(^|-)\w/g, (s) => s.replace("-", " ").toUpperCase());
-  return { name, domain: d, payoutEmail: `payouts@${d}` };
+  // Demo payout identity. Real sellers would be onboarded PayPal accounts; these reserved-domain
+  // addresses can never reach a real retailer.
+  return { name, domain: d, payoutEmail: `${d.replace(/[^a-z0-9]+/g, "-")}@sellers.chaperone.example` };
 }
 
 function remember(list: C3Product[], source: "channel3" | "fixture") {

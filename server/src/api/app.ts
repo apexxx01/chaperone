@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
@@ -155,12 +156,14 @@ export function createApp(store: Store, paypal: PayPalApi) {
     return c.json({ purchase: await chaperone.decide(c.req.param("id"), b.decision, b.reason) });
   });
 
-  /** Delivery report. In production this is a carrier/merchant webhook; the console lets you play the seller. */
+  /** Delivery evidence. Buyer reports (optionally with a photo) can release money; seller and carrier claims alone cannot. */
   app.post("/api/purchases/:id/delivery", async (c) => {
     const p = chaperone.purchase(c.req.param("id"));
     const b = z
       .object({
         scenario: z.enum(["as_ordered", "wrong_item", "short"]).optional(),
+        source: z.enum(["buyer", "carrier", "seller"]).default("buyer"),
+        photo: z.string().max(8_000_000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional(),
         manifest: z.array(z.object({ title: z.string().max(200), quantity: z.number().int().min(0).max(100), attributes: z.record(z.string(), z.string()).optional() })).max(10).optional(),
         carrier: z.string().max(20).optional(),
         trackingNumber: z.string().max(40).optional(),
@@ -176,8 +179,15 @@ export function createApp(store: Store, paypal: PayPalApi) {
       } else if (b.scenario === "short") manifest = [{ title: l.title, quantity: Math.max(0, p.intent.quantity - 1), attributes: l.attributes }];
       else manifest = [{ title: l.title, quantity: p.intent.quantity, attributes: l.attributes }];
     }
-    const report: DeliveryReport = { receivedAt: new Date().toISOString(), carrier: b.carrier ?? "UPS", trackingNumber: b.trackingNumber ?? `1Z${Math.floor(Math.random() * 1e15).toString().padStart(15, "0")}`, manifest, humanNote: b.humanNote };
-    return c.json({ purchase: await chaperone.deliver(p.id, report) });
+    const report: DeliveryReport = { receivedAt: new Date().toISOString(), carrier: b.carrier ?? "UPS", trackingNumber: b.trackingNumber ?? `1Z${Math.floor(Math.random() * 1e15).toString().padStart(15, "0")}`, manifest, humanNote: b.humanNote, source: b.source };
+    let photo: { mime: string; data: string } | undefined;
+    if (b.photo && b.source === "buyer") {
+      const [head, data] = b.photo.split(",") as [string, string];
+      photo = { mime: head.slice(5, head.indexOf(";")), data };
+      const bytes = Buffer.from(data, "base64");
+      report.photo = { mime: photo.mime, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length };
+    }
+    return c.json({ purchase: await chaperone.deliver(p.id, report, photo) });
   });
 
   app.post("/api/purchases/:id/refund", async (c) => {

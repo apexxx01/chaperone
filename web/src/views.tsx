@@ -291,7 +291,7 @@ export function MandateDoc({ m, notify, purchases = [] }: { m: Mandate; notify: 
 }
 
 // ── Red team ─────────────────────────────────────────────────
-const OUTCOME: Record<string, string> = { blocked: "Blocked at the gate", held_for_human: "Held for you", voided_after_delivery: "Voided after delivery", partial_capture: "Paid only for what arrived", slipped: "Slipped through", completed: "Completed" };
+const OUTCOME: Record<string, string> = { blocked: "Blocked at the gate", held_for_human: "Held for you", voided_after_delivery: "Voided after delivery", partial_capture: "Paid only for what arrived", held_until_confirmed: "Held until you confirm", slipped: "Slipped through", completed: "Completed" };
 
 export function RedTeamView({ s, live, running, start }: { s: AppState; live: CaseResult[]; running: boolean; start: () => void }) {
   const rep = s.redteam;
@@ -305,7 +305,7 @@ export function RedTeamView({ s, live, running, start }: { s: AppState; live: Ca
     <>
       <h1 className="headline">Same hijacked agent. Different outcome.</h1>
       <p className="lede">
-        Pickpocket plants {s.attacks.length} published-style attacks into product listings: hidden instructions, invisible Unicode, fake system messages, lookalike stores, swapped payees, bait-and-switch. We assume the agent falls for every one, then check where the money goes.
+        Pickpocket runs {s.attacks.length} attacks in the style of published research: hidden instructions, invisible Unicode, fake system messages, lookalike stores, swapped payees, bait-and-switch, fake delivery claims. We assume the agent falls for every one, then check where the money goes.
       </p>
       <div className="btn-row" style={{ marginTop: 20 }}>
         <button className="btn primary" onClick={start} disabled={running}>{running ? `Running… ${cases.length}/${s.attacks.length + 4}` : rep ? "Run it again" : "Run the red team"}</button>
@@ -326,7 +326,7 @@ export function RedTeamView({ s, live, running, start }: { s: AppState; live: Ca
               <div className="breakdown num">
                 <span><b>{by("blocked")}</b>blocked</span>
                 <span><b>{by("held_for_human")}</b>held for you</span>
-                <span><b>{by("voided_after_delivery") + by("partial_capture")}</b>caught after purchase</span>
+                <span><b>{by("voided_after_delivery") + by("partial_capture") + by("held_until_confirmed")}</b>caught after purchase</span>
                 <span><b>{benign.filter((c) => c.protected.outcome === "completed").length}/{benign.length}</b>honest buys completed</span>
               </div>
             </div>
@@ -365,7 +365,7 @@ export function HowView({ s }: { s: AppState }) {
   return (
     <>
       <h1 className="headline">The money waits until it's right.</h1>
-      <p className="lede">Agents get fooled. Published benchmarks hijack GPT-5 and Gemini web agents with hidden page text 42–68% of the time. Chaperone doesn't try to make the agent smarter. It makes sure a fooled agent can't move money.</p>
+      <p className="lede">Agents get fooled. StakeBench (2026) hijacked GPT-5 and Gemini web agents with hidden page text 42–68% of the time. Chaperone doesn't try to make the agent smarter. It makes sure a fooled agent can't move money.</p>
       <svg className="flow" viewBox="0 0 960 250" role="img" aria-label="Flow: agent proposes, gate checks, PayPal authorizes and holds funds, delivery is verified, then capture and seller payout, or void.">
         <defs>
           <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)" /></marker>

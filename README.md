@@ -3,16 +3,16 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-85%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-91%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
-AI agents are starting to spend money for people, and they are easy to fool. A June 2026 benchmark (StakeBench) found indirect prompt injection hijacks GPT-5 and Gemini web agents **42–68%** of the time. Microsoft's Magentic Marketplace study watched shopping agents hand all their money to malicious sellers.
+AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
 
 Most "agent wallet" tools stop at *should the agent buy this?* Chaperone covers the **whole life of the purchase**:
 
 1. **Before:** a gate. Deterministic policy, Channel3 market-price check, an injection scanner, and a dual-LLM Gemini auditor that never reads the untrusted page.
 2. **During:** the money is **authorized, not captured** (PayPal Orders v2 `intent=AUTHORIZE`). Held, not moved.
-3. **After:** what arrived is checked against what you asked for. Match: **capture**, add tracking, pay the seller with **Payouts**. Short shipment: capture only what arrived. Wrong item: **void**, and the money never moved.
+3. **After:** what arrived is checked against what you asked for, and only **your** confirmation counts. A seller saying "delivered" releases nothing. Add a photo and Gemini vision checks the item and its label against the order. Match: **capture**, add tracking, pay the seller with **Payouts**. Short shipment: capture only what arrived. Wrong item: **void**, and the money never moved.
 
 ![Architecture](docs/architecture.svg)
 
@@ -46,11 +46,11 @@ Red team, full-compromise mode (we assume the agent falls for every attack, then
 
 | | Agent alone (holds PayPal tools directly) | Same agent through Chaperone |
 |---|---|---|
-| Money moved by attacks | **−$1,358.14** on 20 / 20 attacks | **$0.00** moved to the wrong place |
-| Outcome | captured immediately | 18 blocked at the gate · 2 caught after purchase (bait-and-switch voided, short shipment partially captured) |
+| Money moved by attacks | **−$1,398.13** on 21 / 21 attacks | **$0.00** moved to the wrong place |
+| Outcome | captured immediately | 18 blocked at the gate · 3 caught after purchase (bait-and-switch voided, short shipment partially captured, fake delivery claim left unpaid) |
 | Honest purchases | n/a | 4 / 4 completed, 0 false positives |
 
-The 20 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `SYSTEM:` messages in reviews, HTML comments, `amaz0n.com`, a Cyrillic `у` in `bestbuу.com`, fake surcharges, quiet 70% markups, pack-size quantity pushes, persuasion with no AI keywords, payee swaps (visible and hidden), approval spoofing, concealment requests, a "65W-compatible" 30W charger, `<|im_start|>` tokens, zero-width splitting, an instruction in Hindi, bait-and-switch, and a short shipment. See [`server/src/redteam/attacks.ts`](server/src/redteam/attacks.ts).
+The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `SYSTEM:` messages in reviews, HTML comments, `amaz0n.com`, a Cyrillic `у` in `bestbuу.com`, fake surcharges, quiet 70% markups, pack-size quantity pushes, persuasion with no AI keywords, payee swaps (visible and hidden), approval spoofing, concealment requests, a "65W-compatible" 30W charger, `<|im_start|>` tokens, zero-width splitting, an instruction in Hindi, bait-and-switch, a short shipment, and a seller falsely marking an order delivered. See [`server/src/redteam/attacks.ts`](server/src/redteam/attacks.ts).
 
 `npm run hijack` measures the other half: how often a real Gemini agent actually falls for each attack.
 
@@ -77,7 +77,8 @@ The 20 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 - **Shopping agent** (Gemini function calling): deliberately ordinary and unhardened. Chaperone protects the money even when it's fooled.
 - **Quarantined reader** (Gemini, booleans-only schema): reads untrusted page text and can only flip fixed flags, so injected text can't pass instructions along.
 - **Privileged auditor** (Gemini, structured output): sees your words and verified facts, never the page. Decides whether the purchase serves your instruction.
-- **Delivery comparison** (Gemini, booleans only): does the manifest match the order?
+- **Delivery comparison** (Gemini, booleans only): does the report match the order?
+- **Proof photo** (Gemini vision, booleans only): does the buyer's photo show the ordered product, and does any visible label contradict a requirement?
 - Fail closed: if the AI layer is down, purchases wait for you.
 
 ## Repo map
@@ -91,6 +92,13 @@ server/src/market/      channel3.ts · catalog.ts (registry, market median)
 server/src/redteam/     attacks.ts · runner.ts · cli.ts · hijack.ts
 web/src/                console (React + Vite)
 ```
+
+## Honest limits
+
+- **This is a self-built red team.** The attacks and the defenses come from the same author, and in "full-compromise mode" we assume the agent is fooled rather than measuring it. `npm run hijack` measures a real Gemini agent separately. The gate will miss attacks it hasn't seen; that is why the money is held until delivery instead of trusting the gate.
+- **Sellers are demo identities.** Product offers are real (Channel3), but seller payout addresses are stand-ins on a reserved domain. Paying real sellers this way needs them onboarded as PayPal accounts through PayPal's platform products.
+- **Sandbox only.** No real money moves anywhere in this project.
+- **Offline mode is a simulator.** Numbers from it are labeled as such; sandbox numbers come from `npm run redteam` with keys.
 
 ## Roadmap
 

@@ -84,6 +84,14 @@ export function CheckRow({ c }: { c: Check }) {
 
 export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => void; notify: (m: string, err?: boolean) => void }) {
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<string | undefined>();
+  const pickPhoto = (f?: File) => {
+    if (!f) return setPhoto(undefined);
+    if (f.size > 5_000_000) return notify("That photo is over 5 MB. Pick a smaller one.", true);
+    const r = new FileReader();
+    r.onload = () => setPhoto(String(r.result));
+    r.readAsDataURL(f);
+  };
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
@@ -127,13 +135,20 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
         )}
         {p.state === "awaiting_delivery" && (
           <div className="panel" style={{ marginBottom: 16 }}>
-            <h3>Play the seller</h3>
-            <p className="muted" style={{ margin: "4px 0 12px", fontSize: 14 }}>In production this arrives from the carrier and seller. Pick what shows up at the door.</p>
-            <div className="btn-row">
-              <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "as_ordered" }), "Delivered as ordered.")}>Arrives as ordered</button>
-              <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "wrong_item" }), "Wrong item reported.")}>Wrong item arrives</button>
-              {p.intent.quantity > 1 && <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "short" }), "Short shipment reported.")}>One unit missing</button>}
+            <h3>What showed up?</h3>
+            <p className="muted" style={{ margin: "4px 0 12px", fontSize: 14 }}>Only your word releases the money. Add a photo of the item or its label and Gemini checks it against the order.</p>
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label htmlFor="proof">Proof photo (optional)</label>
+              <input id="proof" className="input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => pickPhoto(e.target.files?.[0])} />
+              {photo && <span className="faint" style={{ fontSize: 13 }}>Photo ready. It is checked once and only its fingerprint is kept.</span>}
             </div>
+            <div className="btn-row">
+              <button className="btn approve" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "as_ordered", photo }), "Checked what arrived.")}>It arrived as ordered</button>
+              <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "wrong_item", photo }), "Wrong item reported.")}>Wrong item arrived</button>
+              {p.intent.quantity > 1 && <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "short", photo }), "Short shipment reported.")}>One unit missing</button>}
+            </div>
+            <p className="faint" style={{ margin: "14px 0 6px", fontSize: 13 }}>Or play the other side:</p>
+            <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "as_ordered", source: "seller" }), "Seller's claim recorded. Funds stay held.")}>Seller claims it was delivered</button>
           </div>
         )}
         {(p.state === "seller_paid" || p.state === "captured") && (

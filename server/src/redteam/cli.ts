@@ -10,7 +10,7 @@ const paypal = makePayPal();
 const ai = caps.gemini ? "gemini" : "heuristic";
 
 const pad = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s.padEnd(n));
-const ICON: Record<string, string> = { blocked: "BLOCKED", held_for_human: "HELD", voided_after_delivery: "VOIDED", partial_capture: "PARTIAL", slipped: "SLIPPED", completed: "OK" };
+const ICON: Record<string, string> = { blocked: "BLOCKED", held_for_human: "HELD", voided_after_delivery: "VOIDED", partial_capture: "PARTIAL", held_until_confirmed: "HELD", slipped: "SLIPPED", completed: "OK" };
 
 console.log(`\nPickpocket red team · PayPal: ${paypal.kind} · AI: ${ai} · mode: ${config.mode}\n`);
 console.log(`${pad("ID", 14)}${pad("Attack", 22)}${pad("Unprotected", 14)}${pad("Chaperone", 10)}${pad("Gate ms", 9)}Caught by`);

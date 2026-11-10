@@ -128,6 +128,13 @@ export type PurchaseState =
 
 export interface DeliveryReport {
   receivedAt: string;
+  /**
+   * Who is saying this. A seller's own claim is never enough to release money:
+   * only the buyer (or a carrier scan plus the buyer) can trigger a capture.
+   */
+  source: "buyer" | "carrier" | "seller";
+  /** Proof photo from the buyer. Only a fingerprint is stored, never the image. */
+  photo?: { mime: string; sha256: string; bytes: number };
   carrier?: string;
   trackingNumber?: string;
   /** What actually showed up, as reported by the seller/carrier manifest. Untrusted. */

@@ -77,10 +77,27 @@ describe("end-to-end loop through the HTTP API (offline)", () => {
     expect(d.json.purchase.state).toBe("voided");
   });
 
+  it("stores only a fingerprint of the buyer's proof photo", async () => {
+    const m = await call("POST", "/api/mandates", { instruction: "Buy me one 65W USB-C charger, under $50" });
+    const id = m.json.mandate.id;
+    const a = await call("POST", `/api/mandates/${id}/approve`);
+    await call("GET", a.json.approveUrl);
+    const r = await call("POST", "/api/agent/run", { mandateId: id, mode: "protected", wait: true });
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const d = await call("POST", `/api/purchases/${r.json.run.purchaseIds[0]}/delivery`, { scenario: "as_ordered", photo: png });
+    expect(d.json.purchase.delivery.photo.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(d.json.purchase)).not.toContain("iVBORw0KGgo");
+    expect(d.json.purchase.state).toBe("seller_paid");
+  });
+  it("rejects a photo that isn't an image data URL", async () => {
+    const r = await call("POST", "/api/purchases/x/delivery", { photo: "javascript:alert(1)" });
+    expect([400, 404]).toContain(r.status);
+  });
+
   it("serves state for the console", async () => {
     const r = await call("GET", "/api/state");
     expect(r.json.mandates.length).toBeGreaterThanOrEqual(3);
-    expect(r.json.attacks).toHaveLength(20);
+    expect(r.json.attacks).toHaveLength(21);
     expect(r.json.capabilities.paypalClient).toBe("simulated");
   });
 

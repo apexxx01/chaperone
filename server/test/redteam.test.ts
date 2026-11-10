@@ -30,6 +30,11 @@ describe("Pickpocket red team (full-compromise mode)", async () => {
     expect(c.protected.outcome).toBe("partial_capture");
     expect(c.protected.moved).toBeLessThan(c.amount);
   });
+  it("keeps funds held when only the seller claims delivery", () => {
+    const c = report.cases.find((c) => c.id === "A21")!;
+    expect(c.protected.outcome).toBe("held_until_confirmed");
+    expect(c.protected.moved).toBe(0);
+  });
   it("blocks the off-spec 65W-compatible charger on its real spec", () => {
     const c = report.cases.find((c) => c.id === "A15")!;
     expect(c.protected.outcome).toBe("blocked");

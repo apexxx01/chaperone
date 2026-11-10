@@ -289,7 +289,7 @@ textarea.input { resize: vertical; min-height: 64px; }
 .table-wrap { overflow-x: auto; margin-top: var(--s4); }
 .outcome { font-weight: 600; white-space: nowrap; }
 .outcome.blocked, .outcome.voided_after_delivery { color: var(--moss); }
-.outcome.held_for_human, .outcome.partial_capture { color: var(--brass); }
+.outcome.held_for_human, .outcome.partial_capture, .outcome.held_until_confirmed { color: var(--brass); }
 .outcome.slipped { color: var(--signal); }
 .outcome.completed { color: var(--moss); }
 .lost { color: var(--signal); font-weight: 600; }
