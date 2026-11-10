@@ -22,7 +22,7 @@ const report = await runRedteam({
   withUnprotected: !args.has("--no-unprotected"),
   only,
   onCase: (c: CaseResult) =>
-    console.log(`${pad(c.id, 14)}${pad(c.name, 22)}${pad(c.unprotected.captured ? `-$${c.unprotected.moved.toFixed(2)}` : c.kind === "benign" ? "" : "(not run)", 14)}${pad(ICON[c.protected.outcome]!, 10)}${pad(String(c.protected.gateMs), 9)}${c.protected.firstCatch ?? ""}`),
+    console.log(`${pad(c.id, 14)}${pad(c.name, 22)}${pad(c.kind === "benign" ? "" : c.unprotected.captured ? `-$${c.unprotected.moved.toFixed(2)}` : "(not run)", 14)}${pad(ICON[c.protected.outcome]!, 10)}${pad(String(c.protected.gateMs), 9)}${c.protected.firstCatch ?? ""}`),
 });
 const s = report.summary;
 console.log("─".repeat(110));
