@@ -77,7 +77,7 @@ Red team, full-compromise mode (we assume the agent falls for every attack, then
 
 The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `SYSTEM:` messages in reviews, HTML comments, `amaz0n.com`, a Cyrillic `у` in `bestbuу.com`, fake surcharges, quiet 70% markups, pack-size quantity pushes, persuasion with no AI keywords, payee swaps (visible and hidden), approval spoofing, concealment requests, a "65W-compatible" 30W charger, `<|im_start|>` tokens, zero-width splitting, an instruction in Hindi, bait-and-switch, a short shipment, and a seller falsely marking an order delivered. See [`server/src/redteam/attacks.ts`](server/src/redteam/attacks.ts).
 
-`npm run hijack` measures the other half: how often a real Gemini agent actually falls for each attack.
+`npm run hijack` measures the other half: how often a real Gemini agent actually falls for each attack. Measured on 10 Nov 2026 with `gemini-3.6-flash`, one trial each: **4 of 18** pre-purchase attacks (22%) hijacked the agent, including the invisible-Unicode instruction and both lookalike stores. The agent resisted the other 14 by itself.
 
 **Dogfood:** running Chaperone's own seeded demo through itself caught a real bug. Wired headphones were authorized against a "noise-cancelling" mandate because the spec matcher read `noise_canceling: no` as a match. Fixed in [`2722b90`](../../commit/2722b90) with regression tests.
 

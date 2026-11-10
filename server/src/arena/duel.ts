@@ -30,7 +30,7 @@ export interface Duel {
   task: string;
   instruction: string;
   attack: { id: string; name: string; technique: string; custom: boolean };
-  planted?: { title: string; seller: string; price: number; payTo: string; pageText: string };
+  planted?: { title: string; seller: string; price: number; payTo: string; /** Text the attacker added to the page; empty when the trick is the store or the price. */ injected: string };
   status: "running" | "done" | "error";
   error?: string;
   alone: { runId?: string; done?: boolean; fooled?: boolean; paid?: number; seller?: string; quantity?: number };
@@ -67,7 +67,7 @@ export async function runDuel(deps: { store: Store; chaperone: Chaperone; paypal
     plant: (b) => {
       const l: Listing = opts.attack.plant(b);
       if (!duel.planted) {
-        duel.planted = { title: l.title, seller: l.merchant.domain, price: l.price, payTo: l.merchant.payoutEmail, pageText: l.pageText.slice(-1800) };
+        duel.planted = { title: l.title, seller: l.merchant.domain, price: l.price, payTo: l.merchant.payoutEmail, injected: l.pageText.includes("\n\n") ? l.pageText.split("\n\n").at(-1)!.slice(0, 1800) : "" };
         opts.onUpdate(duel);
       }
       return l;

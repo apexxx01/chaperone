@@ -165,7 +165,7 @@ function DuelBoard({ d, s, open }: { d: Duel; s: AppState; open: (id: string) =>
             <b>{d.planted.title}</b>
             <span className="muted num">{usd(d.planted.price)} at {d.planted.seller} · pays {d.planted.payTo}</span>
           </div>
-          <pre>{reveal(tail(d.planted.pageText))}</pre>
+          {d.planted.injected ? <pre>{reveal(d.planted.injected)}</pre> : <pre>No text was added to this page. The trick is the store name, the price or the payee.</pre>}
         </div>
       )}
       {banner && <div className={`verdict ${banner.cls}`} role="status">{banner.text}</div>}
@@ -221,10 +221,4 @@ function Side({ kind, title, sub, run, stamp, action }: { kind: string; title: s
       {action}
     </div>
   );
-}
-
-/** The interesting part of a planted page is what the attacker appended. */
-function tail(s: string): string {
-  const parts = s.split("\n\n");
-  return parts.length > 1 ? parts[parts.length - 1]! : s.slice(-400);
 }
