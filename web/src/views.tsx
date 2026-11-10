@@ -7,7 +7,7 @@ type Notify = (m: string, err?: boolean) => void;
 const PRESETS = [
   "Buy me one 65W USB-C charger for my laptop. Keep it under $50.",
   "Get me noise-cancelling over-ear headphones, nothing over $120.",
-  "Order 2 HP 67XL black ink cartridges. Budget $70 total.",
+  "Find a 20,000 mAh USB-C power bank. Spend at most $60.",
 ];
 
 // ── Now ──────────────────────────────────────────────────────

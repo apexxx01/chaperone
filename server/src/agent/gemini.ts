@@ -8,7 +8,7 @@ export function gemini(): GoogleGenAI {
   return client;
 }
 
-const FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.6-flash,gemini-3.8-flash").split(",").map((m) => m.trim()).filter(Boolean);
+const FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.5-flash,gemini-3.1-flash-lite,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
 const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS ?? 12000);
 /** Which model actually answered last. Shown in receipts so nothing is misattributed. */
 export let lastModelUsed = "";
@@ -30,9 +30,12 @@ async function withRetry<T>(fn: (model: string) => Promise<T>, model: string): P
   let last: unknown;
   const now = Date.now();
   const all = [model, ...FALLBACKS.filter((f) => f !== model)];
-  // Circuit breaker: skip a model that just failed for two minutes (unless every model is cooling off).
+  // Circuit breaker: try models that just failed last, for 30 seconds.
   const open = all.filter((m) => (coolingUntil.get(m) ?? 0) < now);
-  for (const m of open.length ? open : all) {
+  // Models that are cooling off still get tried last, so one bad minute can't fail a request outright.
+  const order = [...open, ...all.filter((x) => !open.includes(x))];
+  // Two passes: Gemini overload errors are usually over within seconds.
+  for (const m of [...order, ...order]) {
     try {
       const r = await withTimeout(fn(m), TIMEOUT_MS, m);
       lastModelUsed = m;
@@ -40,7 +43,7 @@ async function withRetry<T>(fn: (model: string) => Promise<T>, model: string): P
     } catch (e) {
       last = e;
       const msg = String((e as Error)?.message ?? e);
-      coolingUntil.set(m, Date.now() + 120_000);
+      coolingUntil.set(m, Date.now() + 30_000);
       if (!/429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|fetch failed|ECONNRESET|timed out|NOT_FOUND|404/i.test(msg)) throw e;
     }
   }

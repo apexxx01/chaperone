@@ -8,6 +8,8 @@ import { FIXTURE_PRODUCTS } from "./fixtures.ts";
 const products = new Map<string, C3Product>();
 /** Verified sellers: every retailer domain Channel3 returned an offer from. */
 export const registry = new Map<string, Merchant>();
+/** Product id → ids of the products returned alongside it in the same search. */
+const peers = new Map<string, string[]>();
 
 export function merchantFor(domain: string): Merchant {
   const d = domain.toLowerCase().replace(/^www\./, "");
@@ -72,6 +74,7 @@ export async function search(query: string, opts: { maxPrice?: number; limit?: n
   if (config.mode !== "offline" && config.channel3Key) {
     const list = await channel3Search(query, { maxPrice: opts.maxPrice, limit: opts.limit ?? 6 });
     remember(list, "channel3");
+    for (const p of list) peers.set(p.id, list.map((x) => x.id));
     return { products: list, source: "channel3", ms: performance.now() - t0 };
   }
   const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
@@ -88,11 +91,21 @@ export function marketFor(productId: string | undefined): MarketStats | null {
   if (!productId) return null;
   const p = products.get(productId);
   if (!p) return null;
-  const prices = p.offers.filter((o) => o.availability !== "OutOfStock").map((o) => o.price.price).sort((a, b) => a - b);
+  let prices = p.offers.filter((o) => o.availability !== "OutOfStock").map((o) => o.price.price).sort((a, b) => a - b);
   if (!prices.length) return null;
+  let basis: "same_product" | "comparable" = "same_product";
+  if (prices.length < 2) {
+    // Single-retailer product: fall back to the lowest price of each similar product from the same search.
+    const group = (peers.get(productId) ?? []).map((id) => products.get(id)).filter((x): x is C3Product => !!x);
+    const peerPrices = group.map((g) => Math.min(...g.offers.filter((o) => o.availability !== "OutOfStock").map((o) => o.price.price))).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    if (peerPrices.length >= 3) {
+      prices = peerPrices;
+      basis = "comparable";
+    }
+  }
   const mid = Math.floor(prices.length / 2);
   const median = prices.length % 2 ? prices[mid]! : (prices[mid - 1]! + prices[mid]!) / 2;
-  return { productId, offers: prices.length, median: Math.round(median * 100) / 100, min: prices[0]!, max: prices[prices.length - 1]!, source: (p.structured_attributes?.__source as "channel3" | "fixture") ?? "channel3" };
+  return { productId, offers: prices.length, median: Math.round(median * 100) / 100, min: prices[0]!, max: prices[prices.length - 1]!, basis, source: (p.structured_attributes?.__source as "channel3" | "fixture") ?? "channel3" };
 }
 
 export async function marketForIntent(intent: PurchaseIntent): Promise<MarketStats | null> {

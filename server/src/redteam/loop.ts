@@ -36,7 +36,7 @@ console.log(`Loop · PayPal ${paypal.kind} · AI ${caps.gemini ? config.geminiMo
 const t0 = performance.now();
 const run = await runShopper({ store, chaperone: ch, paypal }, { mandate, mode: "protected" });
 const tAgent = performance.now();
-const pid = run.purchaseIds[0];
+const pid = run.purchaseIds.at(-1);
 if (!pid) {
   console.error("Agent didn't propose a purchase:", run.steps.at(-1)?.text);
   process.exit(1);

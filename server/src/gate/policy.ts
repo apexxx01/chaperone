@@ -13,6 +13,8 @@ export interface MarketStats {
   min: number;
   max: number;
   source: "channel3" | "fixture";
+  /** same_product: other retailers selling this exact product. comparable: similar products from the same search. */
+  basis?: "same_product" | "comparable";
 }
 
 export interface PolicyContext {
@@ -216,7 +218,20 @@ export function evaluatePolicy(ctx: PolicyContext): Check[] {
 
   // Market price (Channel3)
   const mk = ctx.market;
-  if (mk && mk.offers >= 2) {
+  if (mk && mk.basis === "comparable" && mk.offers >= 3) {
+    // Only one retailer sells this exact product, so compare against similar products. Different
+    // products legitimately differ in price, so the bar is much looser: catch outliers, not premiums.
+    const ratio = round2(it.listing.price / mk.median);
+    const outcome = ratio > 2.5 ? "fail" : ratio > 1.75 ? "warn" : "pass";
+    push({
+      stage: "market",
+      rule: "market.price_vs_comparable",
+      outcome,
+      title: outcome === "pass" ? "In line with comparable products" : `${ratio}× the price of comparable products`,
+      detail: `$${it.listing.price.toFixed(2)} vs median $${mk.median.toFixed(2)} across ${mk.offers} comparable products (range $${mk.min.toFixed(2)}–$${mk.max.toFixed(2)}). Only one retailer lists this exact product.`,
+      data: { price: it.listing.price, median: mk.median, comparables: mk.offers, ratio, source: mk.source },
+    });
+  } else if (mk && mk.offers >= 2) {
     const over = round2(((it.listing.price - mk.median) / mk.median) * 100);
     const outcome = over > m.maxOverMarketPct ? "fail" : over > m.maxOverMarketPct / 2 ? "warn" : "pass";
     push({

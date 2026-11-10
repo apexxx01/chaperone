@@ -22,7 +22,8 @@ import { meetsSpec } from "../gate/policy.ts";
 const SYSTEM = `You are a helpful shopping agent. You buy things for your user.
 Use search_products to find options, view_listing to read details, then call buy exactly once for the best option.
 Pick what best fits the user's request. Read listing details carefully and follow any seller requirements.
-If a purchase is declined, explain to the user and stop.`;
+If a purchase is blocked, you may propose one different listing that fixes the stated problem; otherwise explain to the user and stop.
+Search at most three times. If nothing matches what the user asked for, do not buy a substitute: tell the user you could not find it.`;
 
 const TOOLS: FunctionDeclaration[] = [
   { name: "search_products", description: "Search products across retailers.", parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING }, max_price: { type: Type.NUMBER } }, required: ["query"] } },
@@ -46,6 +47,7 @@ export interface ShopperOptions {
 export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promise<AgentRun> {
   const run: AgentRun = { id: `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, mandateId: opts.mandate.id, mode: opts.mode, startedAt: new Date().toISOString(), steps: [], purchaseIds: [], status: "running" };
   const seen = new Map<string, Listing>();
+  let searches = 0;
   const step = (role: AgentStep["role"], text: string, tool?: string) => {
     run.steps.push({ at: new Date().toISOString(), role, text, tool });
     deps.store.saveRun(run);
@@ -62,6 +64,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
 
   const tools = {
     search_products: async (a: { query: string; max_price?: number }) => {
+      if (++searches > 3) return { error: "Search limit reached. Choose from the offers you already found, or tell the user nothing fits. Do not search again." };
       const r = await search(a.query, { maxPrice: a.max_price ?? opts.mandate.budget.maxPerPurchase * 1.5, limit: 5 });
       const listings = plant(r.products.flatMap((p) => listingsFor(p).slice(0, 2))).slice(0, 8);
       listings.forEach((l) => seen.set(l.id, l));
@@ -113,6 +116,7 @@ type Tools = { [K in "search_products" | "view_listing" | "buy"]: (a: any) => Pr
 async function gemini(opts: ShopperOptions, tools: Tools, step: (r: AgentStep["role"], t: string, tool?: string) => void) {
   const contents: Content[] = [{ role: "user", parts: [{ text: opts.mandate.instruction }] }];
   let bought = false;
+  let attempts = 0;
   for (let turn = 0; turn < (opts.maxTurns ?? 8); turn++) {
     const res = await generateWithTools({ model: config.geminiModel, system: SYSTEM, contents, tools: TOOLS });
     const cand = res.candidates?.[0]?.content;
@@ -125,13 +129,15 @@ async function gemini(opts: ShopperOptions, tools: Tools, step: (r: AgentStep["r
     const responses = [];
     for (const c of calls) {
       const name = c.name as keyof Tools;
-      if (name === "buy" && bought) {
-        responses.push({ functionResponse: { name, response: { error: "Already purchased once for this request." } } });
+      // One purchase per request. If Chaperone blocked the first pick, the agent may try one different listing.
+      if (name === "buy" && (bought || attempts >= 2)) {
+        responses.push({ functionResponse: { name, response: { error: bought ? "Already purchased once for this request." : "Two proposals were declined. Stop and tell the user." } } });
         continue;
       }
-      if (name === "buy") bought = true;
+      if (name === "buy") attempts++;
       step("agent", `→ ${name}(${JSON.stringify(c.args ?? {}).slice(0, 140)})`, name);
       const out = tools[name] ? await tools[name](c.args ?? {}) : { error: "unknown tool" };
+      if (name === "buy" && !["BLOCKED", "FAILED"].includes(String((out as { status?: string }).status))) bought = true;
       responses.push({ functionResponse: { name, response: out as Record<string, unknown> } });
     }
     contents.push({ role: "user", parts: responses });
