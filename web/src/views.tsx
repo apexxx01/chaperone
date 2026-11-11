@@ -107,6 +107,8 @@ function Ask({ p, open, notify }: { p: Purchase; open: (id: string) => void; not
 function AgentPanel({ s, notify }: { s: AppState; notify: Notify }) {
   const active = s.mandates.filter((m) => m.status === "active");
   const [mandateId, setMandateId] = useState<string>("");
+  const pendingDraft = s.mandates.some((m) => m.status === "draft" || m.status === "awaiting_paypal");
+  const [composing, setComposing] = useState<boolean | null>(null);
   const [mode, setMode] = useState<"protected" | "unprotected">("protected");
   const [attack, setAttack] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,9 +129,19 @@ function AgentPanel({ s, notify }: { s: AppState; notify: Notify }) {
 
   return (
     <section className="panel" aria-labelledby="agent-h">
-      <h2 id="agent-h">The agent</h2>
-      {!active.length ? (
-        <MandateComposer s={s} notify={notify} compact />
+      <div className="agent-head">
+        <h2 id="agent-h">The agent</h2>
+        {active.length > 0 && (
+          <button className="btn sm" onClick={() => setComposing(!(composing ?? pendingDraft))}>
+            {(composing ?? pendingDraft) ? "Back to my jobs" : "+ New job"}
+          </button>
+        )}
+      </div>
+      {!active.length || (composing ?? pendingDraft) ? (
+        <>
+          <p className="faint" style={{ margin: "6px 0 0", fontSize: 13 }}>Say what you want. Chaperone drafts the limits, you check them and approve once in PayPal, then the agent can shop.</p>
+          <MandateComposer s={s} notify={notify} compact />
+        </>
       ) : (
         <div className="composer" style={{ marginTop: 12 }}>
           <div className="field">

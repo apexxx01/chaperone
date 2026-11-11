@@ -97,7 +97,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     return c.json({ mandate: m, source, ms: Math.round(performance.now() - t0) });
   });
 
-  app.patch("/api/mandates/:id", async (c) => {
+  app.patch("/api/mandates/:id", humanOnly("change a mandate's limits"), async (c) => {
     const m = chaperone.mandate(c.req.param("id"));
     if (m.status !== "draft") throw new LifecycleError("Only draft mandates can be edited; revoke and create a new one");
     const b = z

@@ -161,6 +161,11 @@ describe("who may move money", () => {
       expect(r.json.code).toBe("agent_scope");
     }
   });
+  it("an agent can't loosen its own mandate", async () => {
+    const m = (await call("GET", "/api/state")).json.mandates[0];
+    const r = await call("PATCH", `/api/mandates/${m?.id ?? "x"}`, { maxPerPurchase: 9999 }, "agent");
+    expect(r.status).toBe(403);
+  });
   it("without the human's session, money actions are refused", async () => {
     const r = await call("POST", "/api/purchases/x/decision", { decision: "approve" }, "anon");
     expect(r.status).toBe(401);

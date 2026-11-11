@@ -5,7 +5,7 @@ import { WhatIf } from "./whatif.tsx";
 import { AgentTry } from "./agenttry.tsx";
 
 // ── Money lane ───────────────────────────────────────────────
-const STOPS = ["Proposed", "Checked", "Held", "Delivered", "Paid"] as const;
+const STOPS = ["Asked", "Checked", "Held", "Arrived", "Paid"] as const;
 
 export function coinFor(p: Purchase): { at: number; kind: "waiting" | "stopped" | "paid" | "moving"; label: string } {
   switch (p.state) {
