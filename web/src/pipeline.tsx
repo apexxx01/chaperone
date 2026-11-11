@@ -16,7 +16,7 @@ const NODES: { id: NodeId; x: number; w: number; title: string; does: string }[]
   { id: "agent", x: 8, w: 104, title: "Agent", does: "Any agent proposes a purchase: the built-in Gemini shopper, or yours over MCP. It can propose; it can't pay." },
   { id: "mandate", x: 138, w: 104, title: "Mandate", does: "Is there a signed, unexpired mandate with a PayPal wallet behind it?" },
   { id: "policy", x: 258, w: 104, title: "Policy", does: "Plain code: caps, total budget, quantity, required specs, lookalike stores, payee identity, velocity, duplicates." },
-  { id: "market", x: 378, w: 104, title: "Market price", does: "Price against the same product's offers on other retailers (Channel3), or comparable products." },
+  { id: "market", x: 378, w: 104, title: "Channel3", does: "Catalog truth from Channel3: is this seller one of the product's real retailers, does the page price match the catalog, is it far above its 90-day range, and how does it compare to the same product elsewhere." },
   { id: "scanner", x: 498, w: 104, title: "Scanner", does: "Invisible Unicode, zero-width text, bidi tricks, fake system roles, text addressed to AI, payee redirects." },
   { id: "ai", x: 624, w: 124, title: "AI layer", does: "Two Gemini calls in parallel. The quarantined reader sees the page but can only answer yes/no. The auditor sees your words and the facts, never the page." },
   { id: "decide", x: 772, w: 40, title: "Decision", does: "Any fail blocks. Any warning waits for you. Otherwise PayPal holds the money." },

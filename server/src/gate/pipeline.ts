@@ -1,12 +1,15 @@
 import type { Check, Decision, Mandate, Merchant, Purchase, PurchaseIntent, Verdict } from "../domain/types.ts";
 import { audit, flagsToChecks, readUntrusted } from "./auditor.ts";
 import { evaluatePolicy, round2, type MarketStats } from "./policy.ts";
+import { catalogChecks, type CatalogFacts } from "./catalog.ts";
 import { scanText, type Finding } from "./scanner.ts";
 
 export interface GateDeps {
   registry: Map<string, Merchant>;
   history: (mandateId: string) => Purchase[];
   market: (intent: PurchaseIntent) => Promise<MarketStats | null>;
+  /** Channel3 catalog truth for this exact product (sellers, prices, 90-day history). Optional: offline runs skip it. */
+  catalog?: (intent: PurchaseIntent) => Promise<CatalogFacts | null>;
   now?: () => Date;
 }
 
@@ -76,12 +79,13 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
   const now = deps.now?.() ?? new Date();
 
   const tm = performance.now();
-  const market = await deps.market(intent).catch(() => null);
+  const [market, catalog] = await Promise.all([deps.market(intent).catch(() => null), deps.catalog ? deps.catalog(intent).catch((e) => ({ product: null, history: null, ms: 0, error: String((e as Error)?.message ?? e) })) : Promise.resolve(null)]);
   const marketMs = performance.now() - tm;
 
   const tp = performance.now();
   const deterministic = evaluatePolicy({ mandate, intent, now, registry: deps.registry, history: deps.history(mandate.id), market });
   for (const c of deterministic) c.ms = c.stage === "market" ? Math.round(marketMs) : Math.round(performance.now() - tp);
+  deterministic.push(...catalogChecks(intent, catalog, deps.registry, mandate.budget.maxPerPurchase));
 
   const findings = scanIntent(intent);
   const scan = scannerChecks(findings);

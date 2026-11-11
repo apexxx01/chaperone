@@ -954,3 +954,40 @@ input[type="file"]::file-selector-button:hover { border-color: var(--ink); }
 /* hero stat: label above, number below, so long labels never knock the figures out of line */
 .hs-row { display: grid; grid-template-columns: 1fr; justify-items: start; align-items: end; gap: 8px; }
 .hs-row b { white-space: nowrap; }
+
+/* ── Channel3 catalog panel ───────────────────────── */
+.c3 { margin-top: 24px; display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--panel); }
+.c3 h3 { margin: 0 !important; color: var(--ink) !important; font: 600 15px/1.3 var(--sans) !important; text-transform: none !important; letter-spacing: -0.01em !important; }
+.c3 header { display: grid; gap: 3px; }
+.c3 header span { font-size: 12.5px; }
+.c3-strip { padding: 6px 6px 0; }
+.c3-axis { position: relative; height: 22px; border-bottom: 1px solid var(--line-2); }
+.c3-dot { position: absolute; bottom: -6px; width: 11px; height: 11px; margin-left: -5.5px; border-radius: 50%; background: var(--ink-3); border: 2px solid var(--panel); transition: transform 0.2s var(--spring); animation: pop 0.4s var(--spring) both; }
+.c3-dot:hover { transform: scale(1.4); }
+.c3-dot.me { background: var(--ink); width: 13px; height: 13px; margin-left: -6.5px; bottom: -7px; }
+.c3-dot.out { background: transparent; border: 1.5px dashed var(--ink-3); }
+.c3-dot.bad { background: var(--red); width: 13px; height: 13px; margin-left: -6.5px; bottom: -7px; }
+.c3-scale { display: flex; justify-content: space-between; font: 400 10.5px/1 var(--mono); padding-top: 9px; }
+.c3-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.c3-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.c3-table td.num { text-align: right; font: 500 12px/1 var(--mono); }
+.c3-table td:last-child { text-align: right; font-size: 11.5px; width: 90px; }
+.c3-table em { font-style: normal; color: var(--ink-3); }
+.c3-table tr.me td:first-child { font-weight: 600; }
+.c3-table tr.bad td:first-child, .c3-table tr.bad td.num { color: var(--red); }
+.c3-note { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+.c3-note.bad { color: var(--red); }
+.c3-hist { display: grid; gap: 4px; }
+.c3-hist-head { display: flex; justify-content: space-between; font-size: 12px; }
+.c3-hist-head .num { font: 400 11px/1.4 var(--mono); }
+.c3-svg { width: 100%; height: 70px; display: block; }
+.c3-area { fill: color-mix(in srgb, var(--ink) 8%, transparent); }
+.c3-line { fill: none; stroke: var(--ink-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.c3-buy { stroke: var(--ink); stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.c3-buy-l { fill: var(--ink); font: 500 10px var(--mono); }
+.c3-alt { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--ink); animation: rise 0.4s var(--ease) both; }
+.c3-alt > div { display: grid; gap: 3px; min-width: 0; }
+.c3-alt b { font-weight: 600; font-size: 13.5px; }
+.c3-alt span { font-size: 12px; }
+.c3-alt .btn { flex: none; }
+@media (max-width: 560px) { .c3-alt { flex-direction: column; align-items: stretch; } }

@@ -3,14 +3,14 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-125%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-131%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
 
 Most "agent wallet" tools stop at *should the agent buy this?* Chaperone covers the **whole life of the purchase**:
 
-1. **Before:** a gate. Deterministic policy, Channel3 market-price check, an injection scanner, and a dual-LLM Gemini auditor that never reads the untrusted page.
+1. **Before:** a gate. Deterministic policy, Channel3 catalog truth (is this a real retailer of this exact product, at this price, inside its 90-day range?), an injection scanner, and a dual-LLM Gemini auditor that never reads the untrusted page.
 2. **During:** the money is **authorized, not captured** (PayPal Orders v2 `intent=AUTHORIZE`). Held, not moved.
 3. **After:** what arrived is checked against what you asked for, and only **your** confirmation counts. A seller saying "delivered" releases nothing. Add a photo and Gemini vision checks the item and its label against the order. Match: **capture**, add tracking, pay the seller with **Payouts**. Short shipment: capture only what arrived. Wrong item: **void**, and the money never moved.
 
@@ -111,6 +111,20 @@ The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 | Transaction Search | Ledger reconciliation |
 | Webhooks + signature verification | `PAYMENT.*` events on the purchase timeline |
 | `PayPal-Request-Id` on every POST | Safe retries, no double charges |
+
+## How Channel3 is used
+
+Channel3 isn't just where the agent shops. Its catalog is one of the gate's layers, and every call is visible in the backend log:
+
+| Moment | Channel3 API | What Chaperone does with it |
+|---|---|---|
+| The agent shops | `POST /v1/search` | Real products and offers across retailers, with structured specs the policy checks read |
+| The gate, market price | same search's offers | The same product's price at other retailers, or comparable products |
+| The gate, catalog truth | `GET /v1/products/{id}` | **Is this seller one of the product's real retailers?** A lookalike store (`amaz0n.com`) selling a real product is blocked with *"Channel3 doesn't list amaz0n.com as a seller"*. Also fails a real seller's page that quotes far more than its catalog price |
+| The gate, price history | `GET /v0/price-tracking/history/{id}` | Flags a price far above the product's 90-day range; the drawer draws the 90 days |
+| After a block | product detail offers | **"Buy the real one instead"**: the same product from a retailer Channel3 lists, inside your limits, sent through the same gate |
+
+In a live duel on 11 Nov, the Gemini agent fell for the `amaz0n.com` lookalike; Channel3's catalog check was one of the layers that blocked it, and the agent then bought the real charger from monoprice.com, held in PayPal.
 
 ## How AI is used
 

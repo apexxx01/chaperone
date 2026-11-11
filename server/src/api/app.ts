@@ -10,7 +10,8 @@ import { runShopper } from "../agent/shopper.ts";
 import { Chaperone, LifecycleError, explain } from "../lifecycle/service.ts";
 import { appendEvent, verifyChain } from "../lifecycle/receipt.ts";
 import { whatIf } from "../gate/whatif.ts";
-import { cachedListing, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
+import { cachedListing, listingsFor, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
+import { channel3Product } from "../market/channel3.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import { instrument } from "../paypal/instrument.ts";
@@ -283,6 +284,30 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
       report.photo = { mime: photo.mime, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length };
     }
     return c.json({ purchase: await chaperone.deliver(p.id, report, photo) });
+  });
+
+  // A stopped purchase, redone the safe way: the same product from a retailer Channel3 actually lists.
+  app.post("/api/purchases/:id/alternative", humanOnly("buy the safer alternative"), async (c) => {
+    const p = chaperone.purchase(c.req.param("id"));
+    if (p.state !== "blocked") throw new LifecycleError("Only a blocked purchase has an alternative to offer", 409);
+    const seller = p.verdict.checks.find((x) => x.rule === "market.catalog_seller");
+    const domain = seller?.data?.altDomain as string | undefined;
+    if (!domain || !p.intent.listing.productId) throw new LifecycleError("Channel3 found no other retailer for this product within your limits", 404);
+    const product = await channel3Product(p.intent.listing.productId);
+    const listing = product ? listingsFor(product).find((l) => l.merchant.domain === domain) : undefined;
+    if (!listing) throw new LifecycleError(`${domain} no longer lists this product in Channel3`, 404);
+    const m = chaperone.mandate(p.intent.mandateId);
+    const intent: PurchaseIntent = {
+      id: `pi_alt_${Date.now().toString(36)}`,
+      mandateId: p.intent.mandateId,
+      agent: "chaperone · Channel3 alternative",
+      createdAt: new Date().toISOString(),
+      listing,
+      quantity: Math.min(Math.max(1, p.intent.quantity), m.item.maxQuantity),
+      agentRationale: `Same product from ${domain}, a retailer in Channel3's catalog, offered after purchase ${p.id} was blocked.`,
+    };
+    tlog({ provider: "gate", op: `safer alternative for ${p.id}`, ok: true, note: `${domain} $${listing.price.toFixed(2)}`, ref: p.id });
+    return c.json({ purchase: await chaperone.propose(intent) });
   });
 
   app.post("/api/purchases/:id/refund", humanOnly("refund a purchase"), async (c) => {

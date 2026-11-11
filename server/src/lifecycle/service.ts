@@ -13,7 +13,7 @@
 import type { DeliveryReport, Mandate, Purchase, PurchaseIntent } from "../domain/types.ts";
 import { runGate } from "../gate/pipeline.ts";
 import { round2 } from "../gate/policy.ts";
-import { marketForIntent, registry } from "../market/catalog.ts";
+import { catalogForIntent, marketForIntent, registry } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
 import type { Store } from "../store/store.ts";
@@ -83,7 +83,7 @@ export class Chaperone {
     return this.withLock(intent.mandateId, async () => {
       const m = this.mandate(intent.mandateId);
       const t0 = performance.now();
-      const verdict = await runGate(m, intent, { registry, history: (id) => this.store.purchasesFor(id), market: marketForIntent });
+      const verdict = await runGate(m, intent, { registry, history: (id) => this.store.purchasesFor(id), market: marketForIntent, catalog: catalogForIntent });
       const p: Purchase = {
         id: `pur_${intent.id.replace(/^pi_/, "")}`,
         intent,

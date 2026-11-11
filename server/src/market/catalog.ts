@@ -1,7 +1,8 @@
 import { config } from "../config.ts";
 import type { Listing, Merchant, PurchaseIntent } from "../domain/types.ts";
 import type { MarketStats } from "../gate/policy.ts";
-import { channel3Search, type C3Product } from "./channel3.ts";
+import { channel3PriceHistory, channel3Product, channel3Search, type C3Product } from "./channel3.ts";
+import type { CatalogFacts } from "../gate/catalog.ts";
 import { FIXTURE_PRODUCTS } from "./fixtures.ts";
 
 /** Products seen this session, keyed by Channel3 id. The market reference reads from here. */
@@ -137,4 +138,13 @@ export async function searchListings(query: string, maxPrice?: number): Promise<
 }
 export function cachedListing(id: string): Listing | undefined {
   return listingCache.get(id);
+}
+
+/** Channel3 catalog truth for the gate: product detail and price history, fetched in parallel. */
+export async function catalogForIntent(intent: PurchaseIntent): Promise<CatalogFacts | null> {
+  const id = intent.listing.productId;
+  if (config.mode === "offline" || !config.channel3Key || !id || id.startsWith("fx-")) return null;
+  const t0 = performance.now();
+  const [product, history] = await Promise.all([channel3Product(id), channel3PriceHistory(id).catch(() => null)]);
+  return { product, history, ms: performance.now() - t0 };
 }

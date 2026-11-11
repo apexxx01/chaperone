@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, clock, usd, type Check, type Purchase } from "./api.ts";
 import { WhatIf } from "./whatif.tsx";
+import { CatalogPanel } from "./catalog.tsx";
 import { AgentTry } from "./agenttry.tsx";
 
 // ── Money lane ───────────────────────────────────────────────
@@ -57,7 +58,7 @@ export function Lane({ p, current, onOpen }: { p: Purchase; current?: boolean; o
 }
 
 // ── Purchase drawer (receipts) ───────────────────────────────
-const STAGE_NAME: Record<string, string> = { mandate: "Mandate", policy: "Policy", market: "Market price", scanner: "Scanner", auditor: "AI auditor", human: "You", delivery: "Delivery" };
+const STAGE_NAME: Record<string, string> = { mandate: "Mandate", policy: "Policy", market: "Channel3", scanner: "Scanner", auditor: "AI auditor", human: "You", delivery: "Delivery" };
 
 export function CheckRow({ c }: { c: Check }) {
   const data = c.data ? Object.entries(c.data).filter(([, v]) => v !== null && v !== "" && typeof v !== "boolean") : [];
@@ -173,6 +174,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
           <h3 style={{ marginBottom: 10 }}>Why ({p.verdict.checks.length} checks, {p.verdict.ms.toLocaleString()} ms{p.verdict.checks.some((c) => String(c.data?.source ?? "").includes("cached")) ? ", AI answers reused from an identical earlier page" : ""})</h3>
           <div className="checks">{sorted.map((c, i) => <CheckRow key={i} c={c} />)}</div>
         </section>
+
+        <CatalogPanel p={p} notify={notify} />
 
         <WhatIf p={p} />
 

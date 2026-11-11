@@ -65,7 +65,9 @@ export function whatIf(p: Purchase, mandate: Mandate, siblings: Purchase[], regi
 
   const policy = evaluatePolicy({ mandate: m, intent: p.intent, now: at, registry, history, market: recordedMarket(p) });
   const scan = scannerChecks(scanIntent(p.intent));
-  const ai = p.verdict.checks.filter((c) => c.stage === "auditor").map((c) => ({ ...c, carried: true }));
+  // Reused as recorded: the AI's answers, and Channel3's catalog facts (they describe the product, not your limits).
+  const fromCatalog = (c: Check) => c.rule.startsWith("market.catalog") || c.rule === "market.price_history";
+  const ai = p.verdict.checks.filter((c) => c.stage === "auditor" || fromCatalog(c)).map((c) => ({ ...c, carried: true }));
   // The reader may have confirmed requirements the title didn't state; respect that if the requirement list is unchanged.
   const req = policy.find((c) => c.rule === "policy.requirements");
   const orig = p.verdict.checks.find((c) => c.rule === "policy.requirements");
@@ -83,7 +85,7 @@ export function whatIf(p: Purchase, mandate: Mandate, siblings: Purchase[], regi
     const b = before.get(k);
     if (!b || b.outcome !== c.outcome) changed.push({ rule: k, title: c.title, from: b?.outcome ?? "absent", to: c.outcome, detail: c.detail ?? "" });
   }
-  for (const [k, b] of before) if (!after.has(k) && b.stage !== "auditor" && b.stage !== "delivery") changed.push({ rule: k, title: b.title, from: b.outcome, to: "absent", detail: "No longer applies." });
+  for (const [k, b] of before) if (!after.has(k) && b.stage !== "auditor" && b.stage !== "delivery" && !fromCatalog(b)) changed.push({ rule: k, title: b.title, from: b.outcome, to: "absent", detail: "No longer applies." });
 
   return {
     before: { decision: p.verdict.decision, headline: p.verdict.headline },
