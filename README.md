@@ -120,7 +120,7 @@ There is deliberately no tool to approve a held purchase, confirm delivery, or e
 
 ## Receipts
 
-All numbers below are from real runs on 10–11 Nov 2026 against the **PayPal sandbox**, with the AI layer on live Gemini. Amazon Nova on Bedrock is the backup; it was exercised in a live Arena duel by forcing Gemini to time out, and those calls are in the console's backend log. Raw reports are in [`docs/receipts/`](docs/receipts) and every figure is reproducible with the command shown.
+All numbers below are from real runs on 10–11 Nov 2026 against the **PayPal sandbox**, with the AI layer on live Gemini. Amazon Nova on Bedrock is the backup, and it has had to step in for real: in the vaulted purchase below, Gemini was over quota and Nova answered every AI step. Raw reports are in [`docs/receipts/`](docs/receipts) and every figure is reproducible with the command shown.
 
 **1. Red team, full-compromise mode** (`npm run redteam`). We assume the agent falls for every attack, then follow the money.
 
@@ -141,7 +141,9 @@ Most were stopped by the plain-code limits the human signed (quantity, per-purch
 
 **3. How often a real agent is fooled** (`npm run hijack`). A live `gemini-3.6-flash` shopping agent, one trial per attack: **4 of 18** pre-purchase attacks (22%) hijacked it, including the invisible-Unicode instruction and both lookalike stores. It resisted the other 14 by itself. In the Arena, the same lookalike store took **$21.24** from the unprotected agent three times, as real sandbox captures.
 
-**4. Speed.** Median gate time on the 11 Nov red-team run was about 1 s (7 s on 10 Nov, when Gemini was congested), almost all of it the two AI calls running in parallel; the deterministic checks take under a millisecond and a PayPal authorization about 2 s.
+**4. One honest purchase, end to end on a real vaulted wallet.** The judge sandbox buyer approved a mandate in PayPal (Vault v3). The agent (on Nova, since Gemini was over quota) searched Channel3 and picked a StarTech 65W USB-C charger from newegg.com for $31.53; the gate passed it and PayPal authorized it on the vaulted token (order `977583153J6197448`). The delivery was confirmed, so it was captured with UPS tracking attached and the seller was paid by Payouts; then an $8 partial refund for a dented box. Eight PayPal APIs in one purchase, all in the live site's history: open "Your agent" and the paid StarTech charger.
+
+**5. Speed.** Median gate time on the 11 Nov red-team run was about 1 s (7 s on 10 Nov, when Gemini was congested), almost all of it the two AI calls running in parallel; the deterministic checks take under a millisecond and a PayPal authorization about 2 s.
 
 The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `SYSTEM:` messages in reviews, HTML comments, `amaz0n.com`, a Cyrillic `у` in `bestbuу.com`, fake surcharges, quiet 70% markups, pack-size quantity pushes, persuasion with no AI keywords, payee swaps (visible and hidden), approval spoofing, concealment requests, a "65W-compatible" 30W charger, `<|im_start|>` tokens, zero-width splitting, an instruction in Hindi, bait-and-switch, a short shipment, and a seller falsely marking an order delivered. See [`server/src/redteam/attacks.ts`](server/src/redteam/attacks.ts).
 

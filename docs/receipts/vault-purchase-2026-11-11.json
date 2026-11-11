@@ -1,0 +1,114 @@
+{
+  "what": "Real vaulted-wallet purchase in the PayPal sandbox, 11 Nov 2026",
+  "mandate": {
+    "id": "md_mwc5opqzwt0v",
+    "instruction": "Buy me one 65W USB-C charger for my laptop. Keep it under $50.",
+    "vault": "Vault v3 payment token (approved by the sandbox buyer)",
+    "payer": "sb-1ezxw53857958@personal.example.com"
+  },
+  "purchase": {
+    "id": "pur_mwc5pj6n51gg",
+    "listing": "StarTech 65W USB-C Laptop Charger",
+    "seller": "newegg.com",
+    "amount": {
+      "currency": "USD",
+      "value": 31.53
+    },
+    "verdict": "authorize",
+    "paypal": {
+      "debugIds": [
+        "f9621089f63d9",
+        "ca58da72f1fd2",
+        "ca58da74a2d1d"
+      ],
+      "orderId": "977583153J6197448",
+      "authorizationId": "7WA22383WF071871W",
+      "authorizedAt": "2026-11-11T13:30:32.076Z",
+      "authExpiresAt": "2026-12-10T13:30:31Z",
+      "captureId": "2B418003R6709050B",
+      "capturedAmount": 31.53,
+      "payoutBatchId": "FQM6PV5C27RFN",
+      "refundId": "95N51951K0192921X",
+      "refundCount": 1,
+      "refundedAmount": 8
+    }
+  },
+  "timeline": [
+    {
+      "at": "2026-11-11T13:30:29.509Z",
+      "kind": "proposed",
+      "label": "Agent proposed 1\u00d7 StarTech 65W USB-C Laptop Charger",
+      "detail": "$31.53 at newegg.com",
+      "hash": "ebf2ac4badc68ca8d90bd870615fa52f8a0412180ffe9393671456212663592c"
+    },
+    {
+      "at": "2026-11-11T13:30:29.509Z",
+      "kind": "gate",
+      "label": "Gate: AUTHORIZE",
+      "detail": "Held $31.53 for StarTech 65W USB-C Laptop Charger, not charged. The seller gets paid when it arrives as ordered.",
+      "ms": 1189,
+      "hash": "9b40d2acc9c9638d8db5603bb080924794325493b3d51cf266579e1fabe52729"
+    },
+    {
+      "at": "2026-11-11T13:30:32.076Z",
+      "kind": "authorized",
+      "label": "PayPal authorized $31.53 (held, not captured)",
+      "detail": "Order 977583153J6197448 \u00b7 Authorization 7WA22383WF071871W \u00b7 funds honored for 3 days, authorization valid until 2026-12-10",
+      "ms": 2567,
+      "hash": "b42b58758002e0b6cfb14b291ccc74f560711a0a0976610cd7b7e4ef6fa68121"
+    },
+    {
+      "at": "2026-11-11T13:30:32.076Z",
+      "kind": "loop",
+      "label": "Proposal \u2192 funds held",
+      "ms": 3757,
+      "hash": "f03a3941923693990fb2280c0269a8c958dc7d4c4f2310f6a4fa66499b9915c7"
+    },
+    {
+      "at": "2026-11-11T13:30:41.392Z",
+      "kind": "delivered",
+      "label": "You reported what arrived (UPS 1Z638713602613270)",
+      "detail": "1\u00d7 StarTech 65W USB-C Laptop Charger",
+      "hash": "6d42cdb44ef5a05c8ffd221b6c71f778f5b154de6129df8ba00b5d17d3e8f0e8"
+    },
+    {
+      "at": "2026-11-11T13:30:42.302Z",
+      "kind": "verified",
+      "label": "Delivery check",
+      "detail": "Delivered as ordered. Captured $31.53 and paid the seller.",
+      "ms": 909,
+      "hash": "bc0b6e1fb43bfdbac9b3252600159f299f69006579416707136ecdd65298c67c"
+    },
+    {
+      "at": "2026-11-11T13:30:44.356Z",
+      "kind": "captured",
+      "label": "Captured $31.53",
+      "detail": "Capture 2B418003R6709050B",
+      "ms": 2054,
+      "hash": "8dd17d545f121e1ed42265e6b74f52a563d95907390f04252aef4acea2706b04"
+    },
+    {
+      "at": "2026-11-11T13:30:45.339Z",
+      "kind": "tracked",
+      "label": "Tracking attached to the PayPal order",
+      "detail": "2B418003R6709050B-1Z638713602613270",
+      "hash": "a27c94d9baa2a31a8933945c25f73e3f04d32e383111c827eda164ffc52674be"
+    },
+    {
+      "at": "2026-11-11T13:30:45.722Z",
+      "kind": "payout",
+      "label": "Seller paid via PayPal Payouts: $31.53 \u2192 newegg-com@sellers.chaperone.example",
+      "detail": "Batch FQM6PV5C27RFN (PENDING)",
+      "ms": 383,
+      "hash": "4ba3f87ae6886b4e6c78fafa26ec3e2c78d5e11aff50432253f9fadd22ec5a70"
+    },
+    {
+      "at": "2026-11-11T13:30:48.258Z",
+      "kind": "refunded",
+      "label": "Refunded $8.00, $23.53 still captured",
+      "detail": "Box arrived dented: $8 back, buyer keeps it",
+      "hash": "14da0d6aae275d3922611d9627095148407986346e970d8e1583db9e23054a0a"
+    }
+  ],
+  "ai": "Gemini was over its free-tier quota during this run (429), so Amazon Nova on Bedrock answered every AI step: the shopping agent, the quarantined reader, the auditor and the delivery check."
+}

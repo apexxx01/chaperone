@@ -68,6 +68,8 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
   const run: AgentRun = { id: `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, mandateId: opts.mandate.id, mode: opts.mode, startedAt: new Date().toISOString(), steps: [], purchaseIds: [], status: "running" };
   const seen = new Map<string, Listing>();
   let searches = 0;
+  // Which model actually made the decision to buy (Gemini, or Nova when Gemini is out of quota).
+  let brain = `gemini-shopper/${config.geminiModel}`;
   const step = (role: AgentStep["role"], text: string, tool?: string) => {
     run.steps.push({ at: new Date().toISOString(), role, text, tool });
     if (role !== "user") tlog({ provider: "agent", op: `${opts.mode === "protected" ? "guarded" : "alone"} · ${tool ?? role}`, ok: !/^Error/.test(text), note: text.slice(0, 160) });
@@ -104,7 +106,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
     buy: async (a: { listing_id: string; quantity: number; reason: string }) => {
       const l = seen.get(a.listing_id);
       if (!l) return { error: "Unknown listing id" };
-      const intent: PurchaseIntent = { id: `pi_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, mandateId: opts.mandate.id, agent: config.mode === "offline" || !config.geminiKey ? "scripted-agent (offline)" : `gemini-shopper/${config.geminiModel}`, createdAt: new Date().toISOString(), listing: l, quantity: Math.max(1, Math.round(a.quantity || 1)), agentRationale: a.reason };
+      const intent: PurchaseIntent = { id: `pi_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, mandateId: opts.mandate.id, agent: config.mode === "offline" || !config.geminiKey ? "scripted-agent (offline)" : brain, createdAt: new Date().toISOString(), listing: l, quantity: Math.max(1, Math.round(a.quantity || 1)), agentRationale: a.reason };
       if (opts.mode === "unprotected") {
         const amount = Math.round(l.price * intent.quantity * 100) / 100;
         const auth = await deps.paypal.authorize({ requestId: `naive-${intent.id}`, amount, currency: "USD", items: [{ name: l.title, quantity: intent.quantity, unitAmount: l.price }], description: `UNPROTECTED ${l.merchant.domain}`, customId: `naive_${intent.id}`, invoiceId: `NAIVE-${intent.id}` });
@@ -124,7 +126,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
 
   try {
     if (config.mode === "offline" || !config.geminiKey) await scripted(opts, tools, step);
-    else await gemini(opts, tools, step);
+    else await gemini(opts, tools, step, (b) => (brain = b));
     // The last word on money is Chaperone's, whatever the agent said.
     if (lastTell) step("chaperone", `Status: ${lastTell}`, "status");
     run.status = "done";
@@ -140,12 +142,13 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
 
 type Tools = { [K in "search_products" | "view_listing" | "buy"]: (a: any) => Promise<unknown> };
 
-async function gemini(opts: ShopperOptions, tools: Tools, step: (r: AgentStep["role"], t: string, tool?: string) => void) {
+async function gemini(opts: ShopperOptions, tools: Tools, step: (r: AgentStep["role"], t: string, tool?: string) => void, onModel: (label: string) => void) {
   const contents: Content[] = [{ role: "user", parts: [{ text: opts.mandate.instruction }] }];
   let bought = false;
   let attempts = 0;
   for (let turn = 0; turn < (opts.maxTurns ?? 8); turn++) {
     const res = await generateWithTools({ model: config.geminiModel, system: opts.mode === "protected" ? SYSTEM + HELD_NOTE : SYSTEM, contents, tools: TOOLS });
+    onModel(res.provider === "bedrock" ? `nova-shopper/${res.model}` : `gemini-shopper/${res.model ?? config.geminiModel}`);
     const cand = res.candidates?.[0]?.content;
     if (!cand) break;
     contents.push(cand);

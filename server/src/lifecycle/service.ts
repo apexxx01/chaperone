@@ -73,7 +73,7 @@ export class Chaperone {
   refreshTotals(m: Mandate) {
     const ps = this.store.purchasesFor(m.id);
     m.committed = round2(ps.filter((p) => ["held", "authorized", "awaiting_delivery", "verifying"].includes(p.state)).reduce((s, p) => s + p.amount.value, 0));
-    m.settled = round2(ps.filter((p) => ["captured", "seller_paid"].includes(p.state)).reduce((s, p) => s + (p.paypal.capturedAmount ?? p.amount.value), 0));
+    m.settled = round2(ps.filter((p) => ["captured", "seller_paid"].includes(p.state)).reduce((s, p) => s + (p.paypal.capturedAmount ?? p.amount.value) - (p.paypal.refundedAmount ?? 0), 0));
     if (m.status === "active" && m.settled + m.committed >= m.budget.maxTotal - 0.009) m.status = "exhausted";
     else if (m.status === "exhausted" && m.settled + m.committed < m.budget.maxTotal - 0.009) m.status = "active";
     this.store.saveMandate(m);
@@ -345,8 +345,9 @@ export class Chaperone {
       p.paypal.refundCount = n;
       p.paypal.refundedAmount = round2((p.paypal.refundedAmount ?? 0) + amt);
       if (r.debugId) p.paypal.debugIds.push(r.debugId);
-      p.state = "refunded";
       const rest = round2(captured - p.paypal.refundedAmount);
+      // A partial refund leaves the purchase paid; it only reads "refunded" once nothing is left captured.
+      if (rest <= 0) p.state = "refunded";
       this.event(p, "refunded", `Refunded $${amt.toFixed(2)}${rest > 0 ? `, $${rest.toFixed(2)} still captured` : n === 1 ? " (in full)" : " (now refunded in full)"}`, reason);
       this.store.savePurchase(p);
       this.refreshTotals(this.mandate(p.intent.mandateId));

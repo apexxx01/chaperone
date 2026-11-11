@@ -138,6 +138,8 @@ describe("purchase lifecycle", () => {
     await ch.deliver(p.id, delivered());
     const a = await ch.refund(p.id, "Scuffed box", 10);
     expect(a.paypal.refundedAmount).toBe(10);
+    expect(a.state).toBe("seller_paid");
+    expect(ch.mandate("md").settled).toBe(29.99);
     await expect(ch.refund(p.id, "Again", 30)).rejects.toThrow(/Only \$29\.99 is left/);
     const b = await ch.refund(p.id, "Returned");
     expect(b.paypal.refundedAmount).toBe(39.99);
