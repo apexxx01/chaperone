@@ -950,3 +950,7 @@ input[type="file"]::file-selector-button:hover { border-color: var(--ink); }
   .table td, .table th { padding: 9px 10px; }
   .now-grid, .now-grid > * { min-width: 0; }
 }
+
+/* hero stat: label above, number below, so long labels never knock the figures out of line */
+.hs-row { display: grid; grid-template-columns: 1fr; justify-items: start; align-items: end; gap: 8px; }
+.hs-row b { white-space: nowrap; }
