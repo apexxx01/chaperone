@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, clock, usd, type Check, type Purchase } from "./api.ts";
 import { WhatIf } from "./whatif.tsx";
+import { AgentTry } from "./agenttry.tsx";
 
 // ── Money lane ───────────────────────────────────────────────
 const STOPS = ["Proposed", "Checked", "Held", "Delivered", "Paid"] as const;
@@ -159,6 +160,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
           </div>
         )}
 
+        <AgentTry p={p} />
+
         {p.deliveryVerdict && (
           <section className="section" style={{ marginTop: 24 }}>
             <h3 style={{ marginBottom: 10 }}>What arrived</h3>
@@ -246,7 +249,7 @@ function ChainBadge({ p }: { p: Purchase }) {
     <div className={`chain ${v.ok ? "ok" : "bad"}`}>
       <b>{v.ok ? "Receipt verified in your browser" : `Receipt chain broken at event ${(v.brokenAt ?? 0) + 1}`}</b>
       <span className="num">{v.ok ? `${p.timeline.length} events, each SHA-256 chained to the one before. Head ${v.head.slice(0, 16)}…` : "An event in this purchase's history was changed after it was written."}</span>
-      <a href={`/api/purchases/${p.id}/receipt`} target="_blank" rel="noreferrer">Download the signed-chain receipt (JSON)</a>
+      <a href={`/api/purchases/${p.id}/receipt`} target="_blank" rel="noreferrer">Download the hash-chained receipt (JSON)</a>
     </div>
   );
 }

@@ -152,4 +152,4 @@ export const ago = (iso: string) => {
   if (s < 86400) return `${Math.round(s / 3600)}h ago`;
   return new Date(iso).toLocaleDateString();
 };
-export const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+export const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });

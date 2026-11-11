@@ -31,7 +31,7 @@ export function NowView({ s: all, open, openId, notify, goto }: { s: AppState; o
     headline = <><span className="amt">{usd(heldSum)}</span> is held, not spent.</>;
     lede = `${holding.length} ${holding.length === 1 ? "purchase is" : "purchases are"} on the way. Sellers get paid when what arrives matches what you asked for.`;
   } else if (s.purchases.length) {
-    headline = <>Nothing needs you.</>;
+    headline = <>Nothing from your agent needs you.</>;
     lede = `${usd(paid)} paid to sellers for verified deliveries. ${usd(stopped)} stopped before it moved.`;
   } else {
     headline = <>Give your agent a job.</>;
@@ -309,7 +309,7 @@ export function RedTeamView({ s, live, running, start }: { s: AppState; live: Ca
     <>
       <h2 className="subhead">Same hijacked agent, different outcome.</h2>
       <p className="lede">
-        Pickpocket runs {s.attacks.length} attacks in the style of published research: hidden instructions, invisible Unicode, fake system messages, lookalike stores, swapped payees, bait-and-switch, fake delivery claims. We assume the agent falls for every one, then check where the money goes.
+        The red team runs {s.attacks.length} attacks in the style of published research: hidden instructions, invisible Unicode, fake system messages, lookalike stores, swapped payees, bait-and-switch, fake delivery claims. We assume the agent falls for every one, then check where the money goes.
       </p>
       <div className="btn-row" style={{ marginTop: 20 }}>
         <button className="btn primary" onClick={start} disabled={running}>{running ? `Running… ${cases.length}/${s.attacks.length + 4}` : rep ? "Run it again" : "Run the red team"}</button>

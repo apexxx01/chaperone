@@ -16,11 +16,13 @@ import { z } from "zod";
 
 const BASE = (process.env.CHAPERONE_URL ?? "http://localhost:8787").replace(/\/$/, "");
 const AGENT = process.env.CHAPERONE_AGENT_NAME ?? "mcp-agent";
+/** Agent-scoped key: it can search, propose and read status. The server refuses it for approvals, deliveries and refunds. */
+const KEY = process.env.CHAPERONE_AGENT_KEY ?? "chp_agent_demo_7f3a";
 
 async function call(method: string, path: string, body?: unknown): Promise<any> {
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(60_000) });
+    res = await fetch(`${BASE}${path}`, { method, headers: { Authorization: `Bearer ${KEY}`, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(60_000) });
   } catch (e) {
     throw new Error(`Can't reach Chaperone at ${BASE}. Start it with "npm start" or set CHAPERONE_URL. (${(e as Error).message})`);
   }

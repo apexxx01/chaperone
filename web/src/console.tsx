@@ -8,11 +8,18 @@ import { fmtMs, Icon, inScope, median, Pane, rel, Seg, SCOPES, scopeOf, StateTag
 
 type Notify = (m: string, err?: boolean) => void;
 
-export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, notify }: { s: AppState; lines: LogLine[]; scope: Scope; setScope: (x: Scope) => void; sel?: string; setSel: (id: string) => void; open: (id: string) => void; notify: Notify }) {
+export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, notify, tour, goto }: { s: AppState; lines: LogLine[]; scope: Scope; setScope: (x: Scope) => void; sel?: string; setSel: (id: string) => void; open: (id: string) => void; notify: Notify; tour: () => void; goto: (tab: string) => void }) {
   const now = useNow(1000);
   const ps = useMemo(() => s.purchases.filter(inScope(scope)), [s.purchases, scope]);
   const [replay, setReplay] = useState<{ id: string; n: number } | undefined>();
-  const selected = ps.find((p) => p.id === sel) ?? ps[0];
+  // Until you pick one, trace the attack that the most layers stopped: it shows the whole gate at work.
+  const star = useMemo(() => {
+    const layers = (p: Purchase) => new Set(p.verdict.checks.filter((c) => c.outcome === "fail").map((c) => c.stage)).size;
+    return [...ps].filter((p) => p.state === "blocked").sort((a, b) => layers(b) - layers(a) || b.amount.value - a.amount.value)[0];
+  }, [ps]);
+  const selected = ps.find((p) => p.id === sel) ?? star ?? ps[0];
+  const rt = s.redteam?.summary;
+  const stale = !lines.at(-1) || now - Date.parse(lines.at(-1)!.at) > 30 * 60_000;
   // The guided demo asks for a replay of whatever is selected.
   useEffect(() => {
     const go = () => selected && setReplay((r) => ({ id: selected.id, n: (r?.n ?? 0) + 1 }));
@@ -29,12 +36,43 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
 
   return (
     <div className="console">
+      <section className="hero">
+        <div className="hero-copy">
+          <span className="eyebrow">Purchase protection for AI shopping agents, on PayPal</span>
+          <h1 className="hero-title">
+            Your agent can be fooled. <span>Your money can't.</span>
+          </h1>
+          <p className="lede">
+            Every purchase an agent proposes runs a gate of signed limits, live prices, an injection scanner and two isolated AI models. Approved money is only held in PayPal and released when you confirm the right thing arrived.
+          </p>
+          <div className="btn-row">
+            <button className="btn primary big" onClick={tour}><Icon name="play" size={14} /> <span>Take the 60-second tour</span></button>
+            <button className="btn big" onClick={() => goto("arena")}>Try to rob the agent <Icon name="arrow" size={14} /></button>
+          </div>
+        </div>
+        {rt && (
+          <div className="hero-stat" title="Red team in full-compromise mode: every attack is assumed to fool the agent, then run through PayPal's sandbox both ways.">
+            <div className="hs-row bad">
+              <span>Agent alone, {rt.attacks} attacks</span>
+              <b className="num">−<Num value={rt.unprotectedDollarsMoved} money /></b>
+            </div>
+            <div className="hs-row">
+              <span>Same attacks through Chaperone</span>
+              <b className="num"><Num value={rt.protectedDollarsMovedWrongly} money /></b>
+            </div>
+            <div className="hs-foot faint num">
+              {rt.stoppedAtGate} blocked at the gate · {rt.caughtAfterPurchase} caught at delivery · {rt.benignCompleted}/{rt.benign} honest buys went through
+            </div>
+          </div>
+        )}
+      </section>
+
       <div className="view-head">
         <div>
-          <h1 className="title">Control room</h1>
+          <h2 className="title sm">Control room</h2>
           <p className="status-line num">
-            <i className="livedot" /> {ps.length} purchases · {blocked.length} blocked before PayPal · {usd(heldNow.reduce((a, p) => a + p.amount.value, 0))} held · last backend event {lastAt ? rel(lastAt, now) : "none yet"}
-            {lastAt && rel(lastAt, now) !== "now" ? " ago" : ""}
+            <i className="livedot" /> {ps.length} purchases · {blocked.length} blocked before PayPal · {usd(heldNow.reduce((a, p) => a + p.amount.value, 0))} held ·{" "}
+            {stale ? "showing recorded sandbox runs; run a duel to watch it live" : `last backend event ${rel(lastAt!, now)}${rel(lastAt!, now) !== "now" ? " ago" : ""}`}
           </p>
         </div>
         <Seg value={scope} options={SCOPES} onChange={setScope} label="Which purchases" />

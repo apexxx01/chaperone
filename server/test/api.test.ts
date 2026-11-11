@@ -5,8 +5,19 @@ import { Store } from "../src/store/store.ts";
 
 const store = new Store();
 const { app } = createApp(store, new PayPalSimulated());
-const call = async (method: string, path: string, body?: unknown) => {
-  const res = await app.request(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+// The console's human session, as a browser would get it on page load.
+let cookie = "";
+const session = async () => {
+  if (cookie) return cookie;
+  const r = await app.request("/api/session");
+  cookie = (r.headers.get("set-cookie") ?? "").split(";")[0]!;
+  return cookie;
+};
+const call = async (method: string, path: string, body?: unknown, as: "human" | "agent" | "anon" = "human") => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (as === "human") headers.Cookie = await session();
+  if (as === "agent") headers.Authorization = "Bearer chp_agent_demo_7f3a";
+  const res = await app.request(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const text = await res.text();
   return { status: res.status, json: text ? (JSON.parse(text) as any) : null, headers: res.headers };
 };
@@ -131,5 +142,44 @@ describe("end-to-end loop through the HTTP API (offline)", () => {
   it("validates input", async () => {
     expect((await call("POST", "/api/mandates", { instruction: "" })).status).toBe(400);
     expect((await call("POST", "/api/purchases/nope/decision", { decision: "approve" })).status).toBe(404);
+  });
+});
+
+describe("who may move money", () => {
+  it("an agent key can propose, but can't approve, confirm delivery, refund or sign", async () => {
+    const m = (await call("GET", "/api/state")).json.mandates[0];
+    for (const [path, body] of [
+      ["/api/purchases/x/decision", { decision: "approve" }],
+      ["/api/purchases/x/delivery", { scenario: "as_ordered" }],
+      ["/api/purchases/x/refund", { reason: "because" }],
+      ["/api/mandates", { instruction: "buy me a charger under $50" }],
+      [`/api/mandates/${m?.id ?? "x"}/approve`, {}],
+      ["/api/arena/duel", {}],
+    ] as const) {
+      const r = await call("POST", path, body, "agent");
+      expect(r.status, path).toBe(403);
+      expect(r.json.code).toBe("agent_scope");
+    }
+  });
+  it("without the human's session, money actions are refused", async () => {
+    const r = await call("POST", "/api/purchases/x/decision", { decision: "approve" }, "anon");
+    expect(r.status).toBe(401);
+    expect(r.json.code).toBe("human_session_required");
+  });
+  it("a forged session cookie doesn't count", async () => {
+    const res = await app.request("/api/purchases/x/decision", { method: "POST", headers: { "Content-Type": "application/json", Cookie: "chaperone_human=abc.def" }, body: JSON.stringify({ decision: "approve" }) });
+    expect(res.status).toBe(401);
+  });
+  it("a cross-site request with the cookie is refused", async () => {
+    const res = await app.request("http://localhost/api/purchases/x/decision", { method: "POST", headers: { "Content-Type": "application/json", Cookie: await session(), Origin: "https://evil.example" }, body: JSON.stringify({ decision: "approve" }) });
+    expect(res.status).toBe(401);
+  });
+  it("seller and carrier claims don't need the human (they can't release money anyway)", async () => {
+    const r = await call("POST", "/api/purchases/nope/delivery", { scenario: "as_ordered", source: "seller" }, "agent");
+    expect(r.status).toBe(404);
+  });
+  it("reset is admin only", async () => {
+    const res = await app.request("http://chaperone.example/api/demo/reset", { method: "POST", headers: { Cookie: await session() } });
+    expect(res.status).toBe(403);
   });
 });

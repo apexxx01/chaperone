@@ -172,32 +172,48 @@ function niceMax(v: number) {
 }
 
 // ── Layer matrix (red team) ──────────────────────────────────
+// The quarantined reader sees only the page; the auditor also sees what the other layers found, so it is
+// not independent of them. It counts as an independent catch only when it was the sole layer to fail a purchase.
+const MX = ["mandate", "policy", "market", "scanner", "reader", "auditor", "delivery"] as const;
+const MX_NAME: Record<string, string> = { mandate: "Mandate", policy: "Policy", market: "Market", scanner: "Scanner", reader: "Reader", auditor: "Auditor*", delivery: "Delivery" };
+function caughtBy(p: AppState["purchases"][number] | undefined, fallback: string[]): Set<string> {
+  if (!p) return new Set(fallback);
+  const fails = [...p.verdict.checks, ...(p.deliveryVerdict?.checks ?? [])].filter((x) => x.outcome === "fail" || (x.stage === "delivery" && x.outcome === "warn"));
+  return new Set(fails.map((x) => (x.rule === "auditor.quarantined_reader" ? "reader" : x.stage)));
+}
 function LayerMatrix({ s }: { s: AppState }) {
   const cases = (s.redteam?.cases ?? []).filter((c) => c.kind === "attack");
   const [hover, setHover] = useState<string | null>(null);
   if (!cases.length) return <p className="readout">Run the red team below to fill this in.</p>;
-  const avg = cases.reduce((a, c) => a + (c.protected.layers?.length ?? 0), 0) / cases.length;
-  const multi = cases.filter((c) => (c.protected.layers?.length ?? 0) >= 2).length;
+  const byId = new Map(s.purchases.map((p) => [p.id, p]));
+  const rows = cases.map((c) => {
+    const hit = caughtBy(c.protected.purchaseId ? byId.get(c.protected.purchaseId) : undefined, c.protected.layers ?? []);
+    const indep = [...hit].filter((x) => x !== "auditor" || hit.size === 1);
+    return { c, hit, indep };
+  });
+  const avg = rows.reduce((a, r) => a + r.indep.length, 0) / rows.length;
+  const multi = rows.filter((r) => r.indep.length >= 2).length;
+  const cols = MX.filter((st) => rows.some((r) => r.hit.has(st)));
   return (
     <>
-      <p className="bignote"><b className="num">{avg.toFixed(1)}</b> layers stopped each attack on average. {multi} of {cases.length} were caught by two or more independent layers.</p>
-      <div className="matrix" role="table" aria-label="Which layers caught which attack" style={{ gridTemplateColumns: `minmax(120px, 1.6fr) repeat(${STAGES.length}, minmax(0, 1fr))` }}>
+      <p className="bignote"><b className="num">{avg.toFixed(1)}</b> independent layers stopped each attack on average. {multi} of {rows.length} were caught by two or more layers that don't see each other's results.</p>
+      <div className="matrix" role="table" aria-label="Which layers caught which attack" style={{ gridTemplateColumns: `minmax(120px, 1.6fr) repeat(${cols.length}, minmax(0, 1fr))` }}>
         <span />
-        {STAGES.map((st) => <span key={st} className="mx-head">{STAGE_NAME[st]}</span>)}
-        {cases.map((c) => (
-          <Row key={c.id} label={`${c.id} ${c.name}`} cells={STAGES.map((st) => c.protected.layers?.includes(st) ?? false)} onHover={(st) => setHover(st ? `${c.id} ${c.name}: ${st.hit ? "caught" : "not flagged"} by ${STAGE_NAME[st.stage]}. ${c.technique}` : null)} />
+        {cols.map((st) => <span key={st} className="mx-head">{MX_NAME[st]}</span>)}
+        {rows.map(({ c, hit }) => (
+          <Row key={c.id} label={`${c.id} ${c.name}`} stages={cols} cells={cols.map((st) => hit.has(st))} onHover={(st) => setHover(st ? `${c.id} ${c.name}: ${st.hit ? "caught" : "not flagged"} by ${MX_NAME[st.stage]}. ${c.technique}` : null)} />
         ))}
       </div>
-      <p className="readout">{hover ?? "Filled square: that layer failed the purchase by itself. Hover any square."}</p>
+      <p className="readout">{hover ?? "Filled: that layer failed the purchase. *The auditor also sees the other layers' findings, so it only counts toward the average when it was the only layer to catch an attack."}</p>
     </>
   );
 }
 
-function Row({ label, cells, onHover }: { label: string; cells: boolean[]; onHover: (c: { stage: string; hit: boolean } | null) => void }) {
+function Row({ label, cells, stages, onHover }: { label: string; cells: boolean[]; stages: readonly string[]; onHover: (c: { stage: string; hit: boolean } | null) => void }) {
   return (
     <>
       <span className="mx-label">{label}</span>
-      {cells.map((hit, i) => <span key={i} className={`mx-cell${hit ? " hit" : ""}`} onMouseEnter={() => onHover({ stage: STAGES[i]!, hit })} onMouseLeave={() => onHover(null)} aria-label={hit ? "caught" : "not flagged"} />)}
+      {cells.map((hit, i) => <span key={i} className={`mx-cell${hit ? " hit" : ""}`} onMouseEnter={() => onHover({ stage: stages[i]!, hit })} onMouseLeave={() => onHover(null)} aria-label={hit ? "caught" : "not flagged"} />)}
     </>
   );
 }
@@ -240,21 +256,21 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
         <div><b><Num value={ps.length} /></b><span>purchases proposed by agents</span></div>
         <div><b><Num value={blocked} /></b><span>blocked before PayPal was called</span></div>
         <div><b><Num value={ps.reduce((a, p) => a + p.verdict.checks.length, 0)} /></b><span>individual checks run</span></div>
-        <div className="bad"><b><Num value={st.aloneLost} money /></b><span>captured from unprotected agents</span></div>
-        <div><b><Num value={st.capturedThroughChaperone} money /></b><span>paid to attackers through Chaperone</span></div>
+        <div className="bad"><b><Num value={st.aloneLost} money /></b><span>taken from the agent alone in Arena duels</span></div>
+        <div><b><Num value={st.capturedThroughChaperone} money /></b><span>paid to attackers through Chaperone, ever</span></div>
       </div>
 
       <div className="grid-cells">
         <Panel title="Where the money went" note="Every dollar agents proposed, and where it ended up. Red never reached a seller.">
           <MoneyFlow purchases={ps} />
         </Panel>
-        <Panel title="Which layer stops purchases" note="Purchases failed by each layer. One purchase can be failed by several." table={{ head: ["Layer", "Purchases failed"], rows: catches.map((c) => [c.label, c.value]) }}>
+        <Panel title="Which layer flags purchases" note="Purchases failed by each layer; one purchase can be failed by several. The system map counts only the layer where each one stopped first." table={{ head: ["Layer", "Purchases failed"], rows: catches.map((c) => [c.label, c.value]) }}>
           <Bars rows={catches} unit="purchases" />
         </Panel>
         <Panel title="How long the gate takes" note="Median milliseconds per step, measured on these runs." table={{ head: ["Step", "Median ms"], rows: latency.map((c) => [c.label, c.value]) }}>
-          <Bars rows={latency} unit="ms" format={(n) => `${n.toLocaleString()} ms`} />
+          <Bars rows={latency} unit="ms" format={(n) => (n < 1 ? "<1 ms" : `${n.toLocaleString()} ms`)} />
         </Panel>
-        <Panel title="How often the real agent is fooled" note="Share of live Gemini runs in the Arena that fell for each attack." table={hijack.length ? { head: ["Attack", "% fooled"], rows: hijack.map((c) => [c.label, c.value]) } : undefined}>
+        <Panel title="Arena: how often the live agent was fooled" note="From the duels run on this server, so the sample is small. The controlled study is further down." table={hijack.length ? { head: ["Attack", "% fooled"], rows: hijack.map((c) => [c.label, c.value]) } : undefined}>
           {hijack.length ? <Bars rows={hijack} unit="% of runs" format={(n) => `${n}%`} accent /> : <p className="readout">Run duels in the Arena and this fills in.</p>}
         </Panel>
         <section className="cell wide">
@@ -287,7 +303,8 @@ function HeldOut() {
   const r = useReport<HeldOutReport>("heldout");
   const [hover, setHover] = useState<number | null>(null);
   if (!r) return null;
-  const row = hover != null ? r.rows[hover] : undefined;
+  const pick = r.rows.findIndex((x) => x.outcome !== "blocked");
+  const row = r.rows[hover ?? (pick >= 0 ? pick : 0)];
   return (
     <section className="cell wide" id="t-heldout">
       <header>

@@ -134,6 +134,7 @@ export function App() {
         e.preventDefault();
         return setPalette((p) => !p);
       }
+      if (e.key === "Escape" && help) return setHelp(false);
       const el = e.target as HTMLElement;
       if (el.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") {
@@ -154,7 +155,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state, sel]);
+  }, [state, sel, help]);
 
   const commands = useMemo<Command[]>(() => {
     if (!state) return [];
@@ -229,11 +230,11 @@ export function App() {
           </a>
           <nav>
             {TABS.map((t) => (
-              <button key={t.id} className="nav" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+              <button key={t.id} className="nav" title={`${t.what} · press ${t.key}`} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
                 {tab === t.id && <motion.i layoutId="navmark" className="navmark" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
                 <Icon name={t.icon} />
                 <span className="nav-label">{t.label}</span>
-                {t.id === "now" && heldCount > 0 ? <b className="badge num">{heldCount}</b> : <Kbd>{t.key}</Kbd>}
+                {t.id === "now" && heldCount > 0 && <b className="badge num" title={`${heldCount} waiting for you`}>{heldCount}</b>}
               </button>
             ))}
           </nav>
@@ -265,8 +266,8 @@ export function App() {
               <button className={`btn sm tour-btn${toured ? "" : " fresh"}`} onClick={() => setTouring(true)}>
                 <Icon name="play" size={13} /> <span>Tour</span>
               </button>
-              <span className={`conn ${connected ? "on" : ""}`} title={connected ? "Receiving live events from the backend" : "Reconnecting to the backend"}>
-                <i /> {connected ? "Live" : "Reconnecting"} <span className="num faint">{lines.length ? `#${lines.at(-1)!.seq}` : ""}</span>
+              <span className={`conn ${connected ? "on" : ""}`} title={connected ? "Streaming from the backend over SSE. The count is how many calls and steps it has logged." : "Reconnecting to the backend"}>
+                <i /> {connected ? "Live" : "Reconnecting"} <span className="num faint">{lines.length ? `· ${lines.at(-1)!.seq} events` : ""}</span>
               </span>
               <span className="num clock">{new Date(now).toLocaleTimeString([], { hour12: false })}</span>
               <button className="icon-btn" onClick={() => setTheme(theme === "light" ? "" : "light")} aria-label={theme === "light" ? "Switch to black" : "Switch to white"}>
@@ -280,7 +281,7 @@ export function App() {
 
           <AnimatePresence mode="wait">
             <motion.main key={tab} className="view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}>
-              {tab === "console" && <ConsoleView s={state} lines={lines} scope={scope} setScope={setScope} sel={sel} setSel={setSel} open={setOpenId} notify={notify} />}
+              {tab === "console" && <ConsoleView s={state} lines={lines} scope={scope} setScope={setScope} sel={sel} setSel={setSel} open={setOpenId} notify={notify} tour={() => setTouring(true)} goto={(t) => setTab(t as Tab)} />}
               {tab === "arena" && <ArenaView s={state} notify={notify} open={setOpenId} lines={lines} />}
               {tab === "now" && <NowView s={state} open={setOpenId} openId={openId} notify={notify} goto={(t) => setTab(t as Tab)} />}
               {tab === "mandates" && <MandatesView s={state} notify={notify} />}

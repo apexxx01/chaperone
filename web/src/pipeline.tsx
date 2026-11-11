@@ -239,7 +239,7 @@ export function Pipeline({ purchases, replay, caption = true, compact = false }:
                 <g key={n.id} className={`node diamond${lit(n.id)}${hover === n.id ? " hov" : ""}`} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} tabIndex={0} onFocus={() => setHover(n.id)}>
                   <path d={`M${x},${CY - 20} L${x + 20},${CY} L${x},${CY + 20} L${x - 20},${CY} Z`} className="node-box" />
                   <text x={x} y={CY - 30} className="n-title" textAnchor="middle">Decide</text>
-                  <text x={x + 14} y={CY + 22} className="n-ms">{stats.ms.decide}</text>
+                  <text x={x + 24} y={CY - 7} className="n-ms">{stats.ms.decide}</text>
                 </g>
               );
             }

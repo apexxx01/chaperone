@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { capabilities, config } from "../config.ts";
+import { adminOnly, AGENT_KEY, humanOnly, isAgent, rateLimit, refuseUnlessHuman, sessionCookie } from "./auth.ts";
 import type { DeliveryReport, Listing, PurchaseIntent } from "../domain/types.ts";
 import { draftMandate, mandateFromDraft } from "../agent/mandate.ts";
 import { runShopper } from "../agent/shopper.ts";
@@ -33,6 +34,10 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     console.error(err);
     return c.json({ error: String(err.message ?? err) }, 500);
   });
+
+  app.use("*", sessionCookie);
+  app.get("/api/session", (c) => c.json({ human: !isAgent(c), agentKey: AGENT_KEY }));
+  const MIN = 60_000;
 
   app.get("/api/telemetry", (c) => c.json(telemetrySnapshot()));
 
@@ -83,7 +88,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   );
 
   // ── Mandates ──────────────────────────────────────────────────
-  app.post("/api/mandates", async (c) => {
+  app.post("/api/mandates", humanOnly("sign a mandate"), rateLimit("mandate drafts", 12, 10 * MIN), async (c) => {
     const body = z.object({ instruction: z.string().min(4).max(400), autoApproveUnder: z.number().positive().optional() }).parse(await c.req.json());
     const t0 = performance.now();
     const { draft, source } = await draftMandate(body.instruction);
@@ -120,7 +125,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   });
 
   /** The human signs the mandate in PayPal: Vault v3 setup token → approve → payment token. */
-  app.post("/api/mandates/:id/approve", async (c) => {
+  app.post("/api/mandates/:id/approve", humanOnly("approve a wallet for a mandate"), async (c) => {
     const m = chaperone.mandate(c.req.param("id"));
     if (m.status !== "draft" && m.status !== "awaiting_paypal") throw new LifecycleError(`Mandate is ${m.status}`);
     if (paypal.kind === "sandbox" && config.paypal.paymentMode === "card") {
@@ -153,7 +158,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     return c.redirect(`/?mandate=${m.id}&paypal=approved`);
   });
 
-  app.post("/api/mandates/:id/revoke", (c) => {
+  app.post("/api/mandates/:id/revoke", humanOnly("revoke a mandate"), (c) => {
     const m = chaperone.mandate(c.req.param("id"));
     m.status = "revoked";
     store.saveMandate(m);
@@ -161,7 +166,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   });
 
   // ── Agent runs ────────────────────────────────────────────────
-  app.post("/api/agent/run", async (c) => {
+  app.post("/api/agent/run", humanOnly("send the agent shopping"), rateLimit("shopping runs", 6, 10 * MIN), async (c) => {
     const b = z.object({ mandateId: z.string(), mode: z.enum(["protected", "unprotected"]).default("protected"), attackId: z.string().optional(), wait: z.boolean().optional() }).parse(await c.req.json());
     const mandate = chaperone.mandate(b.mandateId);
     if (b.mode === "protected" && mandate.status !== "active") throw new LifecycleError(`Mandate is ${mandate.status}; approve it in PayPal first`);
@@ -216,7 +221,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   });
 
   // Re-run the real deterministic gate on a past purchase under different limits.
-  app.post("/api/purchases/:id/whatif", async (c) => {
+  app.post("/api/purchases/:id/whatif", rateLimit("what-if replays", 120, MIN), async (c) => {
     const p = chaperone.purchase(c.req.param("id"));
     const b = z
       .object({
@@ -236,14 +241,13 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
 
   app.get("/api/purchases/:id", (c) => c.json({ purchase: chaperone.purchase(c.req.param("id")) }));
 
-  app.post("/api/purchases/:id/decision", async (c) => {
+  app.post("/api/purchases/:id/decision", humanOnly("approve or decline a held purchase"), async (c) => {
     const b = z.object({ decision: z.enum(["approve", "deny"]), reason: z.string().max(200).optional() }).parse(await c.req.json());
     return c.json({ purchase: await chaperone.decide(c.req.param("id"), b.decision, b.reason) });
   });
 
   /** Delivery evidence. Buyer reports (optionally with a photo) can release money; seller and carrier claims alone cannot. */
   app.post("/api/purchases/:id/delivery", async (c) => {
-    const p = chaperone.purchase(c.req.param("id"));
     const b = z
       .object({
         scenario: z.enum(["as_ordered", "wrong_item", "short"]).optional(),
@@ -255,6 +259,12 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
         humanNote: z.string().max(300).optional(),
       })
       .parse(await c.req.json());
+    // Only the buyer's own word can release money, so a buyer report needs the human's session.
+    if (b.source === "buyer") {
+      const no = refuseUnlessHuman(c, "confirm a delivery");
+      if (no) return no;
+    }
+    const p = chaperone.purchase(c.req.param("id"));
     let manifest = b.manifest;
     if (!manifest) {
       const l = p.intent.listing;
@@ -275,7 +285,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     return c.json({ purchase: await chaperone.deliver(p.id, report, photo) });
   });
 
-  app.post("/api/purchases/:id/refund", async (c) => {
+  app.post("/api/purchases/:id/refund", humanOnly("refund a purchase"), async (c) => {
     const b = z.object({ reason: z.string().min(2).max(200), amount: z.number().positive().optional() }).parse(await c.req.json());
     return c.json({ purchase: await chaperone.refund(c.req.param("id"), b.reason, b.amount) });
   });
@@ -283,7 +293,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   // ── Arena: same agent, same attack, with and without Chaperone ──
   let duelRunning = false;
   let lastDuelAt = 0;
-  app.post("/api/arena/duel", async (c) => {
+  app.post("/api/arena/duel", humanOnly("start a duel"), rateLimit("duels", 4, 10 * MIN), async (c) => {
     const b = z
       .object({
         task: z.enum(["charger", "headphones"]).default("charger"),
@@ -321,7 +331,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
 
   // ── Red team ──────────────────────────────────────────────────
   let redteamRunning = false;
-  app.post("/api/redteam/run", async (c) => {
+  app.post("/api/redteam/run", humanOnly("run the red team"), rateLimit("red-team runs", 1, 15 * MIN), async (c) => {
     if (redteamRunning) throw new LifecycleError("A red-team run is already in progress");
     const b = z.object({ only: z.array(z.string()).optional(), withUnprotected: z.boolean().optional() }).parse(await c.req.json().catch(() => ({})));
     redteamRunning = true;
@@ -356,7 +366,7 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     return c.json(await paypal.searchTransactions({ start, end }));
   });
 
-  app.post("/api/demo/reset", (c) => {
+  app.post("/api/demo/reset", adminOnly, (c) => {
     store.reset();
     return c.json({ ok: true });
   });

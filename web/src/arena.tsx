@@ -139,12 +139,15 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
 
       {s.duels.length > 1 && (
         <section className="section">
-          <div className="section-head"><h2>Earlier duels</h2></div>
+          <div className="section-head"><h2>Earlier duels</h2><p>Robberies first. A capable model often resists on its own; the point is what happens on the runs where it doesn't.</p></div>
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>Attack</th><th>Agent alone</th><th>With Chaperone</th><th>Result</th></tr></thead>
               <tbody>
-                {s.duels.filter((d) => d.status === "done").map((d) => (
+                {s.duels
+                  .filter((d) => d.status === "done")
+                  .sort((a, b) => (b.alone.fooled ? 1 : 0) - (a.alone.fooled ? 1 : 0) || (b.alone.paid ?? 0) - (a.alone.paid ?? 0))
+                  .map((d) => (
                   <tr key={d.id} onClick={() => setFocus(d.id)} style={{ cursor: "pointer" }}>
                     <td><b>{d.attack.custom ? "Custom attack" : `${d.attack.id} ${d.attack.name}`}</b><div className="tech">{d.attack.technique}</div></td>
                     <td className="num">{d.alone.fooled ? <span className="lost">−{usd(d.alone.paid ?? 0)}</span> : <span className="faint">resisted</span>}</td>
