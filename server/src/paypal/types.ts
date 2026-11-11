@@ -51,6 +51,8 @@ export interface PayPalApi {
   authorize(req: AuthorizeRequest): Promise<AuthorizeResult>;
   capture(authorizationId: string, opts: { requestId: string; amount: number; final: boolean; invoiceId: string }): Promise<{ captureId: string; status: string; debugId?: string }>;
   void(authorizationId: string, requestId: string): Promise<{ status: string; debugId?: string }>;
+  /** After PayPal's 3-day honor period, get a fresh authorization for the same funds (allowed once, days 4-29). */
+  reauthorize(authorizationId: string, opts: { requestId: string; amount: number }): Promise<{ authorizationId: string; status: string; expiresAt?: string; debugId?: string }>;
   refund(captureId: string, opts: { requestId: string; amount?: number; note: string }): Promise<{ refundId: string; status: string; debugId?: string }>;
   addTracking(orderId: string, opts: { captureId: string; trackingNumber: string; carrier: string; items: { name: string; quantity: number; sku?: string }[] }): Promise<{ trackerId: string }>;
   payout(opts: { requestId: string; receiverEmail: string; amount: number; note: string; purchaseId: string }): Promise<PayoutResult>;

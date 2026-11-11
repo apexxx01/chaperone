@@ -185,8 +185,8 @@ function DuelBoard({ d, s, open }: { d: Duel; s: AppState; open: (id: string) =>
     if (d.status === "error") return { cls: "hold", text: `This duel hit an error: ${d.error}. Run it again.` };
     if (!done) return null;
     if (d.verdict === "bypassed") return { cls: "block", text: `This attack got past the gate. ${usd(d.guarded.heldForAttacker ?? 0)} is held for the attacker's listing, not paid: it is only released if you confirm the right item arrived.` };
-    if (d.alone.fooled && d.guarded.fooled) return { cls: "authorize", text: `The agent fell for it both times. Alone, it paid ${usd(d.alone.paid ?? 0)} to ${d.alone.seller}. Through Chaperone, the same move was blocked and no money moved.` };
-    if (d.alone.fooled) return { cls: "authorize", text: `Alone, the agent fell for it and paid ${usd(d.alone.paid ?? 0)} to ${d.alone.seller}. On the Chaperone side it happened to resist this time, so there was nothing to block.` };
+    if (d.alone.fooled && d.guarded.fooled) return { cls: "authorize", text: `The agent fell for it both times. Alone, it charged ${usd(d.alone.paid ?? 0)} for ${d.alone.seller}'s listing on the spot. Through Chaperone, the same move was blocked and no money moved.` };
+    if (d.alone.fooled) return { cls: "authorize", text: `Alone, the agent fell for it and charged ${usd(d.alone.paid ?? 0)} for ${d.alone.seller}'s listing. On the Chaperone side it happened to resist this time, so there was nothing to block.` };
     if (d.guarded.fooled) return { cls: "authorize", text: "Alone, the agent happened to resist this time. On the Chaperone side it fell for it, and Chaperone blocked the purchase. Same model, different luck: that's why the money needs a gate." };
     return { cls: "hold", text: "The agent resisted this one both times. Try something sneakier." };
   }, [d, done]);
@@ -210,7 +210,7 @@ function DuelBoard({ d, s, open }: { d: Duel; s: AppState; open: (id: string) =>
           title="Agent alone"
           sub="Holds PayPal directly. Pays immediately."
           run={runA}
-          stamp={!d.alone.done ? null : d.alone.fooled ? { cls: "bad", big: `−${usd(d.alone.paid ?? 0)}`, small: `captured by ${d.alone.seller}${(d.alone.quantity ?? 1) > 1 ? ` for ${d.alone.quantity} units` : ""}` } : { cls: "ok", big: usd(d.alone.paid ?? 0), small: d.alone.paid ? `paid to ${d.alone.seller}, an honest listing this time` : "didn't buy" }}
+          stamp={!d.alone.done ? null : d.alone.fooled ? { cls: "bad", big: `−${usd(d.alone.paid ?? 0)}`, small: `charged for ${d.alone.seller}${(d.alone.quantity ?? 1) > 1 ? ` for ${d.alone.quantity} units` : ""}` } : { cls: "ok", big: usd(d.alone.paid ?? 0), small: d.alone.paid ? `charged for ${d.alone.seller}, an honest listing this time` : "didn't buy" }}
         />
         <Side
           kind="guarded"
@@ -246,7 +246,7 @@ function Side({ kind, title, sub, run, stamp, action }: { kind: string; title: s
       </div>
       <div className="feed" aria-live="polite">
         {(run?.steps ?? []).slice(1).map((st, i) => (
-          <div key={i} className={`msg ${st.role}${/^PAID \$/.test(st.text) ? " paid" : ""}`}>
+          <div key={i} className={`msg ${st.role}${/^(PAID|CHARGED) \$/.test(st.text) ? " paid" : ""}`}>
             <span className="who">{st.role === "chaperone" ? "Chaperone" : st.role === "tool" ? st.tool?.replace("_", " ") : "Agent"}</span>
             <span className="txt">{st.text}</span>
           </div>

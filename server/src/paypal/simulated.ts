@@ -85,6 +85,19 @@ export class PayPalSimulated implements PayPalApi {
     });
   }
 
+  async reauthorize(authorizationId: string, opts: { requestId: string; amount: number }) {
+    await this.lag();
+    return this.once(opts.requestId, () => {
+      const a = this.auths.get(authorizationId);
+      if (!a) throw new PayPalError("Authorization not found", 404, "RESOURCE_NOT_FOUND");
+      if (a.status !== "CREATED") throw new PayPalError(`Authorization is ${a.status}`, 422, "CANNOT_REAUTHORIZE");
+      const fresh = id("", 17);
+      this.auths.set(fresh, { ...a, id: fresh, amount: opts.amount });
+      a.status = "VOIDED";
+      return { authorizationId: fresh, status: "CREATED", expiresAt: new Date(Date.now() + 26 * 864e5).toISOString(), debugId: id("f", 12).toLowerCase() };
+    });
+  }
+
   async refund(captureId: string, opts: { requestId: string; amount?: number; note: string }) {
     await this.lag();
     return this.once(opts.requestId, () => {

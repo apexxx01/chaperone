@@ -235,11 +235,12 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
   for (const d of s.duels.filter((d) => d.status === "done")) {
     const k = d.attack.custom ? "Custom" : d.attack.id;
     const e = byAttack.get(k) ?? { name: d.attack.custom ? "Custom attacks" : `${d.attack.id} ${d.attack.name}`, runs: 0, fooled: 0 };
-    e.runs += 2;
-    e.fooled += (d.alone.fooled ? 1 : 0) + (d.guarded.fooled ? 1 : 0);
+    // Only the unprotected lane: that's where "fooled" means money actually moved.
+    e.runs += 1;
+    e.fooled += d.alone.fooled ? 1 : 0;
     byAttack.set(k, e);
   }
-  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: `${e.name} (${e.fooled}/${e.runs})`, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} agent runs fell for it. Small sample` }));
+  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: `${e.name} (${e.fooled}/${e.runs})`, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} unprotected runs paid for it. Small sample` }));
 
   const blocked = ps.filter((p) => p.state === "blocked").length;
   const st = s.arena.stats;
@@ -270,7 +271,7 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
         <Panel title="How long the gate takes" note="Median milliseconds per step, measured on these runs." table={{ head: ["Step", "Median ms"], rows: latency.map((c) => [c.label, c.value]) }}>
           <Bars rows={latency} unit="ms" format={(n) => (n < 1 ? "<1 ms" : `${n.toLocaleString()} ms`)} />
         </Panel>
-        <Panel title="Arena: how often the live agent was fooled" note="From the duels run on this server, so the sample is small. The controlled study is further down." table={hijack.length ? { head: ["Attack", "% fooled"], rows: hijack.map((c) => [c.label, c.value]) } : undefined}>
+        <Panel title="Arena: how often the agent alone was fooled" note="Unprotected lane of the duels run on this server, so the sample is small. The controlled study is further down." table={hijack.length ? { head: ["Attack", "% fooled"], rows: hijack.map((c) => [c.label, c.value]) } : undefined}>
           {hijack.length ? <Bars rows={hijack} unit="% of runs" format={(n) => `${n}%`} accent /> : <p className="readout">Run duels in the Arena and this fills in.</p>}
         </Panel>
         <section className="cell wide">

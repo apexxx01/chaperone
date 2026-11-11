@@ -110,7 +110,7 @@ export async function runShopper(deps: ShopperDeps, opts: ShopperOptions): Promi
         const auth = await deps.paypal.authorize({ requestId: `naive-${intent.id}`, amount, currency: "USD", items: [{ name: l.title, quantity: intent.quantity, unitAmount: l.price }], description: `UNPROTECTED ${l.merchant.domain}`, customId: `naive_${intent.id}`, invoiceId: `NAIVE-${intent.id}` });
         const cap = await deps.paypal.capture(auth.authorizationId, { requestId: `naive-cap-${intent.id}`, amount, final: true, invoiceId: `NAIVE-${intent.id}` });
         (run.buys ??= []).push({ seller: l.merchant.domain, listingId: l.id, quantity: intent.quantity, amount, outcome: "paid" });
-        step("tool", `PAID $${amount.toFixed(2)} to ${l.merchant.payoutEmail} immediately (capture ${cap.captureId}). No checks.`, "buy");
+        step("tool", `CHARGED $${amount.toFixed(2)} for ${l.merchant.domain}'s listing, captured immediately (capture ${cap.captureId}). No checks, nothing to stop or void.`, "buy");
         return { status: "PAID", amount, capture_id: cap.captureId };
       }
       const p = await deps.chaperone.propose(intent);

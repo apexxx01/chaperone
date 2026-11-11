@@ -133,6 +133,50 @@ describe("purchase lifecycle", () => {
     const r = await ch.refund(p.id, "Defective on arrival");
     expect(r.state).toBe("refunded");
   });
+  it("partial refunds add up and can never pass what was captured", async () => {
+    const p = await ch.propose(intent());
+    await ch.deliver(p.id, delivered());
+    const a = await ch.refund(p.id, "Scuffed box", 10);
+    expect(a.paypal.refundedAmount).toBe(10);
+    await expect(ch.refund(p.id, "Again", 30)).rejects.toThrow(/Only \$29\.99 is left/);
+    const b = await ch.refund(p.id, "Returned");
+    expect(b.paypal.refundedAmount).toBe(39.99);
+    expect(b.paypal.refundCount).toBe(2);
+    expect(pp.captures.get(b.paypal.captureId!)!.refunded).toBeCloseTo(39.99);
+    await expect(ch.refund(p.id, "Once more")).rejects.toThrow(/in full/);
+  });
+  it("re-authorizes before capturing once PayPal's 3-day honor period has passed", async () => {
+    const p = await ch.propose(intent());
+    const first = p.paypal.authorizationId!;
+    store.purchases.get(p.id)!.paypal.authorizedAt = new Date(Date.now() - 5 * 864e5).toISOString();
+    const done = await ch.deliver(p.id, delivered());
+    expect(done.state).toBe("seller_paid");
+    expect(done.paypal.reauthorized).toBe(true);
+    expect(done.paypal.authorizationId).not.toBe(first);
+    expect(done.timeline.some((e) => /Re-authorized/.test(e.label))).toBe(true);
+  });
+  it("voids and closes out a purchase whose authorization lapsed with nobody confirming", async () => {
+    const p = await ch.propose(intent());
+    store.purchases.get(p.id)!.paypal.authExpiresAt = new Date(Date.now() - 1000).toISOString();
+    expect(await ch.expireStale()).toBe(1);
+    const after = store.purchases.get(p.id)!;
+    expect(after.state).toBe("voided");
+    expect(pp.auths.get(p.paypal.authorizationId!)!.status).toBe("VOIDED");
+    expect(ch.mandate("md").committed).toBe(0);
+    expect(await ch.expireStale()).toBe(0);
+  });
+  it("retries a failed seller payout without ever paying twice", async () => {
+    const p = await ch.propose(intent());
+    const real = pp.payout.bind(pp);
+    pp.payout = async () => { throw new Error("Payouts is down"); };
+    const stuck = await ch.deliver(p.id, delivered());
+    expect(stuck.state).toBe("captured");
+    pp.payout = real;
+    const paid = await ch.retryPayout(p.id);
+    expect(paid.state).toBe("seller_paid");
+    expect(pp.payouts).toHaveLength(1);
+    await expect(ch.retryPayout(p.id)).rejects.toBeInstanceOf(LifecycleError);
+  });
   it("serializes parallel agents so the budget can't be raced", async () => {
     const m = store.mandates.get("md")!;
     m.budget.maxTotal = 80;

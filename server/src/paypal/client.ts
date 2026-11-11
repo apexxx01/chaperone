@@ -133,6 +133,11 @@ export class PayPalSandbox implements PayPalApi {
     return { status: (r.status as string) ?? "VOIDED", debugId: r.__debugId };
   }
 
+  async reauthorize(authorizationId: string, opts: { requestId: string; amount: number }) {
+    const r = await this.call("POST", `/v2/payments/authorizations/${authorizationId}/reauthorize`, { amount: { currency_code: "USD", value: opts.amount.toFixed(2) } }, { requestId: opts.requestId });
+    return { authorizationId: r.id as string, status: r.status as string, expiresAt: r.expiration_time as string | undefined, debugId: r.__debugId };
+  }
+
   async refund(captureId: string, opts: { requestId: string; amount?: number; note: string }) {
     const r = await this.call("POST", `/v2/payments/captures/${captureId}/refund`, {
       ...(opts.amount ? { amount: { currency_code: "USD", value: opts.amount.toFixed(2) } } : {}),

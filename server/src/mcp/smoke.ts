@@ -3,14 +3,18 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const BASE = process.env.CHAPERONE_URL ?? "http://localhost:8787";
-const j = async (m: string, p: string, b?: unknown) => (await fetch(BASE + p, { method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : undefined, redirect: "manual" })).json().catch(() => ({})) as Promise<any>;
+// Play the human: take the console's session cookie, the way a browser opening the page would.
+const cookie = ((await fetch(BASE + "/api/session")).headers.get("set-cookie") ?? "").split(";")[0]!;
+if (!cookie) { console.error("FAIL: the server didn't hand out a console session"); process.exit(1); }
+const j = async (m: string, p: string, b?: unknown) => (await fetch(BASE + p, { method: m, headers: { "Content-Type": "application/json", Cookie: cookie }, body: b ? JSON.stringify(b) : undefined, redirect: "manual" })).json().catch(() => ({})) as Promise<any>;
 const out = (r: any) => JSON.parse(r.content[0].text);
 const assert = (c: unknown, m: string) => { if (!c) { console.error("FAIL:", m); process.exit(1); } console.log("ok  ", m); };
 
 // The human signs a mandate (not something the agent can do).
 const m = await j("POST", "/api/mandates", { instruction: "Buy me one 65W USB-C charger for my laptop. Keep it under $50." });
 const a = await j("POST", `/api/mandates/${m.mandate.id}/approve`);
-if (a.approveUrl?.startsWith("/")) await fetch(BASE + a.approveUrl, { redirect: "manual" });
+if (a.approveUrl?.startsWith("/")) await fetch(BASE + a.approveUrl, { redirect: "manual", headers: { Cookie: cookie } });
+else if (a.approveUrl) console.log("note: live PayPal needs the human to approve in a browser; the smoke test then uses the existing signed mandates");
 
 const client = new Client({ name: "smoke", version: "0.0.0" });
 await client.connect(new StdioClientTransport({ command: "npx", args: ["tsx", new URL("./server.ts", import.meta.url).pathname], env: { ...process.env, CHAPERONE_URL: BASE } as Record<string, string> }));

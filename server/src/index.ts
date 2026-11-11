@@ -8,7 +8,12 @@ import { Store } from "./store/store.ts";
 
 const store = new Store(config.dataDir, config.mode === "live" ? new URL("../seed/snapshot.json", import.meta.url).pathname : undefined);
 const paypal = makePayPal();
-const { app } = createApp(store, paypal);
+const { app, chaperone } = createApp(store, paypal);
+
+// Close out purchases whose PayPal authorization lapsed with nobody confirming (checked at boot, then every 15 min).
+const sweep = () => chaperone.expireStale().then((n) => n && console.log(`expired ${n} stale authorization(s)`)).catch(() => {});
+void sweep();
+setInterval(sweep, 15 * 60_000).unref();
 
 const webDist = new URL("../../web/dist/", import.meta.url).pathname;
 if (existsSync(webDist)) {

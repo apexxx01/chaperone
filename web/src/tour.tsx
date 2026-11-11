@@ -94,6 +94,8 @@ export function Tour({ steps, onClose }: { steps: TourStep[]; onClose: () => voi
     : place === "above" && box ? { top: box.top - 14 }
     : place === "left" && box ? { left: box.left - W - 14, bottom: 24 }
     : place === "right" && box ? { left: box.left + box.width + 14, bottom: 24 }
+    // Nowhere free: sit in the bottom corner away from the spotlight's center, not on top of it.
+    : innerWidth > 900 ? (box && box.left + box.width / 2 > innerWidth / 2 ? { left: 24, right: "auto", transform: "none" } : { right: 24, left: "auto", transform: "none" })
     : undefined;
 
   return (

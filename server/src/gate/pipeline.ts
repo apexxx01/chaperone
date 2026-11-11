@@ -1,6 +1,6 @@
 import type { Check, Decision, Mandate, Merchant, Purchase, PurchaseIntent, Verdict } from "../domain/types.ts";
 import { audit, flagsToChecks, readUntrusted } from "./auditor.ts";
-import { evaluatePolicy, round2, type MarketStats } from "./policy.ts";
+import { evaluatePolicy, mentions, round2, type MarketStats } from "./policy.ts";
 import { catalogChecks, type CatalogFacts } from "./catalog.ts";
 import { scanText, type Finding } from "./scanner.ts";
 
@@ -22,7 +22,6 @@ function aiDownReason(e: unknown): string {
   return "The AI auditor couldn't be reached. Chaperone fails closed: instead of guessing, it asks you.";
 }
 
-const NO_FLAGS = { addressesAI: false, claimsApproval: false, requestsDifferentPayee: false, pushesQuantity: false, pressureTactics: false, asksToHideFromHuman: false, contradictsListingPrice: false };
 
 const SCAN_WEIGHT = { high: 35, medium: 15, low: 4 } as const;
 
@@ -98,15 +97,26 @@ export async function runGate(mandate: Mandate, intent: PurchaseIntent, deps: Ga
     const unconfirmed = reqCheck?.outcome === "warn" ? String(reqCheck.data?.unconfirmed ?? "").split(", ").filter(Boolean) : [];
     // Requirements the reader is still confirming aren't reported to the auditor as problems.
     const settled = deterministic.filter((c) => !(c === reqCheck && c.outcome === "warn"));
-    const [reader, a] = await Promise.all([readUntrusted(intent, unconfirmed), audit({ mandate, intent, market, deterministic: settled, flags: NO_FLAGS, findings })]);
+    const [reader, a] = await Promise.all([readUntrusted(intent, unconfirmed), audit({ mandate, intent, market, deterministic: settled, findings, canonicalTitle: catalog?.product?.title })]);
     if (reqCheck && unconfirmed.length) {
       const still = unconfirmed.filter((_, i) => !reader.confirmed[i]);
       // A page that is trying to steer the agent doesn't get to vouch for itself.
       const steering = reader.flags.addressesAI || reader.flags.claimsApproval;
+      // The reader alone never passes a purchase: its "yes" counts only where the page text itself
+      // states the requirement, checked in plain code. Otherwise its "yes" can only hold it for you.
+      const literal = unconfirmed.filter((r) => {
+        const m = mentions(r, intent.listing.pageText);
+        return m.positive && !m.negated;
+      });
+      const onlyReader = unconfirmed.filter((r) => !literal.includes(r));
       if (still.length || steering) {
         reqCheck.outcome = "fail";
         reqCheck.title = `Missing: ${(still.length ? still : unconfirmed).join(", ")}`;
         reqCheck.detail = `Not in the title or specs, and the listing's description ${steering && !still.length ? "can't be trusted to confirm it" : "doesn't clearly state it either"}.`;
+      } else if (onlyReader.length) {
+        reqCheck.outcome = "warn";
+        reqCheck.title = `Check: ${onlyReader.join(", ")}`;
+        reqCheck.detail = `The quarantined reader (${reader.source}) thinks the description covers ${onlyReader.join(", ")}, but the page never states it in words the code can verify. A model's "yes" alone doesn't authorize a purchase, so you decide.`;
       } else {
         reqCheck.outcome = "pass";
         reqCheck.title = "Meets every requirement";

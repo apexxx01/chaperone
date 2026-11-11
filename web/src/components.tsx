@@ -80,7 +80,7 @@ export function CheckRow({ c }: { c: Check }) {
         )}
       </span>
       <span className="stage">
-        {STAGE_NAME[c.stage] ?? c.stage}
+        {c.rule === "auditor.quarantined_reader" ? "AI reader" : (STAGE_NAME[c.stage] ?? c.stage)}
         {c.ms != null && c.ms > 0 ? <><br />{c.ms} ms</> : null}
       </span>
     </div>
@@ -156,11 +156,28 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
             <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/delivery`, { scenario: "as_ordered", source: "seller" }), "Seller's claim recorded. Funds stay held.")}>Seller claims it was delivered</button>
           </div>
         )}
-        {(p.state === "seller_paid" || p.state === "captured") && (
-          <div className="btn-row" style={{ marginBottom: 16 }}>
-            <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/refund`, { reason: "Returned by buyer" }), "Refunded through PayPal.")}>Refund through PayPal</button>
-          </div>
-        )}
+        {(() => {
+          if (!p.paypal.captureId || !["seller_paid", "captured", "refunded"].includes(p.state)) return null;
+          const captured = p.paypal.capturedAmount ?? p.amount.value;
+          const left = Math.round((captured - (p.paypal.refundedAmount ?? 0)) * 100) / 100;
+          const unit = p.intent.listing.price;
+          return (
+            <div style={{ marginBottom: 16 }}>
+              {p.state === "captured" && !p.paypal.payoutBatchId && !p.paypal.payee && (
+                <div className="btn-row" style={{ marginBottom: 10 }}>
+                  <button className="btn approve" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/payout`), "Seller paid.")}>Retry the seller payout</button>
+                  <span className="faint" style={{ fontSize: 13 }}>Captured, but the Payout didn't go through. Retrying can't pay twice.</span>
+                </div>
+              )}
+              {left > 0 && (
+                <div className="btn-row">
+                  <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/refund`, { reason: "Returned by buyer" }), "Refunded through PayPal.")}>Refund ${left.toFixed(2)} through PayPal</button>
+                  {p.intent.quantity > 1 && unit < left && <button className="btn" disabled={busy} onClick={() => act(() => api("POST", `/api/purchases/${p.id}/refund`, { reason: "One unit returned", amount: unit }), "Partial refund sent.")}>Refund one unit (${unit.toFixed(2)})</button>}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <AgentTry p={p} />
 
@@ -205,7 +222,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
             <Id k="Authorization" v={p.paypal.authorizationId} />
             <Id k="Capture" v={p.paypal.captureId} />
             <Id k="Payout batch" v={p.paypal.payoutBatchId} />
-            <Id k="Refund" v={p.paypal.refundId} />
+            <Id k="Refund" v={p.paypal.refundId ? `${p.paypal.refundId}${p.paypal.refundedAmount ? ` · $${p.paypal.refundedAmount.toFixed(2)} refunded${(p.paypal.refundCount ?? 1) > 1 ? ` over ${p.paypal.refundCount} refunds` : ""}` : ""}` : undefined} />
+            {p.paypal.authExpiresAt && ["awaiting_delivery", "authorized"].includes(p.state) && <Id k="Authorization valid until" v={`${p.paypal.authExpiresAt.slice(0, 10)}${p.paypal.reauthorized ? " (re-authorized)" : ""}`} />}
             <Id k="Debug ids" v={p.paypal.debugIds.join(", ") || undefined} />
           </dl>
           {!p.paypal.orderId && <p className="faint" style={{ fontSize: 14 }}>No PayPal call was made. Nothing was authorized or charged.</p>}

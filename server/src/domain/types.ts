@@ -156,6 +156,13 @@ export interface Purchase {
     capturedAmount?: number;
     payoutBatchId?: string;
     refundId?: string;
+    /** Total refunded so far, across partial refunds. */
+    refundedAmount?: number;
+    refundCount?: number;
+    authorizedAt?: string;
+    /** When PayPal says this authorization lapses (expiration_time). */
+    authExpiresAt?: string;
+    reauthorized?: boolean;
     /** Set when the order was made out to the seller directly (no Payouts hop). */
     payee?: string;
     debugIds: string[];

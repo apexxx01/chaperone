@@ -133,9 +133,11 @@ export class Chaperone {
       if (config.paypal.sellerPayee) p.paypal.payee = config.paypal.sellerPayee;
       p.paypal.orderId = r.orderId;
       p.paypal.authorizationId = r.authorizationId;
+      p.paypal.authorizedAt = now();
+      p.paypal.authExpiresAt = r.expiresAt;
       if (r.debugId) p.paypal.debugIds.push(r.debugId);
       p.state = "awaiting_delivery";
-      this.event(p, "authorized", `PayPal authorized $${p.amount.value.toFixed(2)} (held, not captured)`, `Order ${r.orderId} · Authorization ${r.authorizationId}${r.expiresAt ? ` · honor period to ${r.expiresAt.slice(0, 10)}` : ""}`, performance.now() - ta);
+      this.event(p, "authorized", `PayPal authorized $${p.amount.value.toFixed(2)} (held, not captured)`, `Order ${r.orderId} · Authorization ${r.authorizationId} · funds honored for 3 days${r.expiresAt ? `, authorization valid until ${r.expiresAt.slice(0, 10)}` : ""}`, performance.now() - ta);
       this.event(p, "loop", "Proposal → funds held", undefined, performance.now() - t0);
     } catch (e) {
       p.state = "failed";
@@ -208,6 +210,7 @@ export class Chaperone {
           this.event(p, "voided", `Authorization voided. $${p.amount.value.toFixed(2)} never left your account`, settlement.reason, performance.now() - t);
         } else {
           const amount = settlement.amount;
+          await this.refreshIfPastHonor(p, amount);
           const t = performance.now();
           const c = await this.paypal.capture(p.paypal.authorizationId!, { requestId: `cap-${p.id}`, amount, final: true, invoiceId: `CHP-${p.id}` });
           p.paypal.captureId = c.captureId;
@@ -249,17 +252,102 @@ export class Chaperone {
     });
   }
 
-  /** After capture, if something goes wrong later (return, defect), refund through PayPal. */
+  /**
+   * PayPal guarantees authorized funds for 3 days; after that a capture can fail for lack of funds.
+   * Past day 3 (and before expiry), get a fresh authorization first. It's allowed once; if PayPal
+   * refuses, the capture is still attempted on the original.
+   */
+  private async refreshIfPastHonor(p: Purchase, amount: number) {
+    const at = p.paypal.authorizedAt ? Date.parse(p.paypal.authorizedAt) : NaN;
+    if (!Number.isFinite(at) || p.paypal.reauthorized || Date.now() - at < 3 * 864e5) return;
+    const t = performance.now();
+    try {
+      const r = await this.paypal.reauthorize(p.paypal.authorizationId!, { requestId: `reauth-${p.id}`, amount: p.amount.value });
+      p.paypal.authorizationId = r.authorizationId;
+      p.paypal.authorizedAt = now();
+      if (r.expiresAt) p.paypal.authExpiresAt = r.expiresAt;
+      p.paypal.reauthorized = true;
+      if (r.debugId) p.paypal.debugIds.push(r.debugId);
+      this.event(p, "authorized", "Re-authorized after PayPal's 3-day honor period", `New authorization ${r.authorizationId} before capturing $${amount.toFixed(2)}`, performance.now() - t);
+    } catch (e) {
+      p.paypal.reauthorized = true;
+      this.event(p, "warn", "Couldn't re-authorize; capturing on the original authorization", explain(e));
+    }
+  }
+
+  /**
+   * Authorizations lapse (PayPal's expiration_time, 29 days). A purchase still waiting at that point is
+   * voided and closed out here, so nothing sits "held" forever and the budget is freed.
+   */
+  async expireStale(at = Date.now()): Promise<number> {
+    let n = 0;
+    for (const p0 of [...this.store.purchases.values()]) {
+      if (p0.state !== "awaiting_delivery" || !p0.paypal.authorizationId) continue;
+      const exp = p0.paypal.authExpiresAt ? Date.parse(p0.paypal.authExpiresAt) : p0.paypal.authorizedAt ? Date.parse(p0.paypal.authorizedAt) + 29 * 864e5 : NaN;
+      if (!Number.isFinite(exp) || exp > at) continue;
+      await this.withLock(p0.intent.mandateId, async () => {
+        const p = this.purchase(p0.id);
+        if (p.state !== "awaiting_delivery") return;
+        try {
+          const r = await this.paypal.void(p.paypal.authorizationId!, `void-${p.id}`);
+          if (r.debugId) p.paypal.debugIds.push(r.debugId);
+        } catch (e) {
+          this.event(p, "warn", "Void on expiry was refused (PayPal may have expired it already)", explain(e));
+        }
+        p.state = "voided";
+        this.event(p, "voided", `Authorization expired with no confirmation. $${p.amount.value.toFixed(2)} released back to you`, "Nobody confirmed the delivery before PayPal's authorization lapsed, so nothing was paid.");
+        this.store.savePurchase(p);
+        this.refreshTotals(this.mandate(p.intent.mandateId));
+        n++;
+      });
+    }
+    return n;
+  }
+
+  /** A capture went through but the Payout to the seller failed: send it again (same request id, so never twice). */
+  async retryPayout(purchaseId: string): Promise<Purchase> {
+    const p0 = this.purchase(purchaseId);
+    return this.withLock(p0.intent.mandateId, async () => {
+      const p = this.purchase(purchaseId);
+      if (p.state !== "captured" || !p.paypal.captureId || p.paypal.payoutBatchId || p.paypal.payee) throw new LifecycleError("This purchase has no failed payout to retry");
+      const amount = p.paypal.capturedAmount ?? p.amount.value;
+      const t = performance.now();
+      try {
+        const po = await this.paypal.payout({ requestId: `pay-${p.id}`, receiverEmail: p.intent.listing.merchant.payoutEmail, amount, note: `Payment for verified delivery: ${p.intent.listing.title.slice(0, 80)} (${p.id})`, purchaseId: p.id });
+        p.paypal.payoutBatchId = po.batchId;
+        p.state = "seller_paid";
+        this.event(p, "payout", `Seller paid via PayPal Payouts (retry): $${amount.toFixed(2)} → ${p.intent.listing.merchant.payoutEmail}`, `Batch ${po.batchId} (${po.status})`, performance.now() - t);
+      } catch (e) {
+        this.event(p, "error", "Payout retry failed. The capture is safe; try again later", explain(e));
+        this.store.savePurchase(p);
+        throw new LifecycleError(`Payout failed again: ${explain(e)}`, 502);
+      }
+      this.store.savePurchase(p);
+      this.refreshTotals(this.mandate(p.intent.mandateId));
+      return p;
+    });
+  }
+
+  /** After capture, if something goes wrong later (return, defect), refund through PayPal. Partial refunds add up, never past what was captured. */
   async refund(purchaseId: string, reason: string, amount?: number): Promise<Purchase> {
     const p0 = this.purchase(purchaseId);
     return this.withLock(p0.intent.mandateId, async () => {
       const p = this.purchase(purchaseId);
       if (!p.paypal.captureId) throw new LifecycleError("Nothing captured to refund");
-      const r = await this.paypal.refund(p.paypal.captureId, { requestId: `ref-${p.id}-${amount ?? "full"}`, amount, note: reason });
+      const captured = p.paypal.capturedAmount ?? p.amount.value;
+      const left = round2(captured - (p.paypal.refundedAmount ?? 0));
+      if (left <= 0) throw new LifecycleError("Already refunded in full");
+      const amt = amount == null ? left : round2(amount);
+      if (amt > left + 0.001) throw new LifecycleError(`Only $${left.toFixed(2)} is left to refund on this capture`, 422);
+      const n = (p.paypal.refundCount ?? 0) + 1;
+      const r = await this.paypal.refund(p.paypal.captureId, { requestId: `ref-${p.id}-${n}`, amount: amt, note: reason });
       p.paypal.refundId = r.refundId;
+      p.paypal.refundCount = n;
+      p.paypal.refundedAmount = round2((p.paypal.refundedAmount ?? 0) + amt);
       if (r.debugId) p.paypal.debugIds.push(r.debugId);
       p.state = "refunded";
-      this.event(p, "refunded", `Refunded${amount ? ` $${amount.toFixed(2)}` : " in full"}`, reason);
+      const rest = round2(captured - p.paypal.refundedAmount);
+      this.event(p, "refunded", `Refunded $${amt.toFixed(2)}${rest > 0 ? `, $${rest.toFixed(2)} still captured` : n === 1 ? " (in full)" : " (now refunded in full)"}`, reason);
       this.store.savePurchase(p);
       this.refreshTotals(this.mandate(p.intent.mandateId));
       return p;

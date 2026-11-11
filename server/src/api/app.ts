@@ -37,6 +37,16 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     return c.json({ error: String(err.message ?? err) }, 500);
   });
 
+  // The console runs only its own code: no third-party scripts, no framing, fonts from Google only.
+  app.use("*", async (c, next) => {
+    await next();
+    c.header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("X-Frame-Options", "DENY");
+    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+    if ((c.req.header("x-forwarded-proto") ?? new URL(c.req.url).protocol.replace(":", "")) === "https") c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  });
   app.use("*", sessionCookie);
   passkeyRoutes(app);
   app.get("/api/session", (c) => c.json({ human: !isAgent(c), agentKey: AGENT_KEY }));
@@ -311,6 +321,8 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
     tlog({ provider: "gate", op: `safer alternative for ${p.id}`, ok: true, note: `${domain} $${listing.price.toFixed(2)}`, ref: p.id });
     return c.json({ purchase: await chaperone.propose(intent) });
   });
+
+  app.post("/api/purchases/:id/payout", humanWithPasskey("pay the seller"), async (c) => c.json({ purchase: await chaperone.retryPayout(c.req.param("id")) }));
 
   app.post("/api/purchases/:id/refund", humanWithPasskey("refund a purchase"), async (c) => {
     const b = z.object({ reason: z.string().min(2).max(200), amount: z.number().positive().optional() }).parse(await c.req.json());

@@ -112,7 +112,9 @@ function AgentPanel({ s, notify }: { s: AppState; notify: Notify }) {
   const [mode, setMode] = useState<"protected" | "unprotected">("protected");
   const [attack, setAttack] = useState("");
   const [busy, setBusy] = useState(false);
-  const latestJob = active.find((m) => s.runs.some((r) => r.mandateId === m.id && r.mode !== "unprotected")) ?? active[0];
+  // Open on a job that can still buy something, so "Run" works on the first click.
+  const funded = active.filter((m) => m.budget.maxTotal - (m.committed ?? 0) - (m.settled ?? 0) >= Math.min(m.budget.maxPerPurchase, m.budget.maxTotal) * 0.5);
+  const latestJob = funded.find((m) => s.runs.some((r) => r.mandateId === m.id && r.mode !== "unprotected")) ?? funded[0] ?? active[0];
   const chosen = active.find((m) => m.id === mandateId) ?? latestJob;
   const run = s.runs.find((r) => r.mandateId === chosen?.id);
 
@@ -173,7 +175,7 @@ function AgentPanel({ s, notify }: { s: AppState; notify: Notify }) {
       {run && (
         <div className="feed" aria-live="polite">
           {run.steps.map((st, i) => (
-            <div key={i} className={`msg ${st.role}${/^PAID \$/.test(st.text) ? " paid" : ""}`}>
+            <div key={i} className={`msg ${st.role}${/^(PAID|CHARGED) \$/.test(st.text) ? " paid" : ""}`}>
               <span className="who">{st.role === "chaperone" ? "Chaperone" : st.role === "tool" ? st.tool?.replace("_", " ") : st.role === "user" ? "You" : "Agent"}</span>
               <span className="txt">{st.text}</span>
             </div>

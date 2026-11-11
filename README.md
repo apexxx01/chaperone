@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/apexxx01/chaperone/actions/workflows/ci.yml"><img src="https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-131%20passing-111111" alt="131 tests passing">
+  <img src="https://img.shields.io/badge/tests-145%20passing-111111" alt="145 tests passing">
   <img src="https://img.shields.io/badge/PayPal-Orders%20v2%20%C2%B7%20Vault%20%C2%B7%20Payouts-111111" alt="PayPal APIs">
   <img src="https://img.shields.io/badge/AI-Gemini%20%2B%20Bedrock%20Nova-111111" alt="Gemini and Bedrock">
   <img src="https://img.shields.io/badge/catalog-Channel3-111111" alt="Channel3">
@@ -120,7 +120,7 @@ There is deliberately no tool to approve a held purchase, confirm delivery, or e
 
 ## Receipts
 
-All numbers below are from real runs on 10–11 Nov 2026 against the **PayPal sandbox**, with the AI layer on live Gemini (Amazon Nova on Bedrock answered the one call Gemini couldn't). Raw reports are in [`docs/receipts/`](docs/receipts) and every figure is reproducible with the command shown.
+All numbers below are from real runs on 10–11 Nov 2026 against the **PayPal sandbox**, with the AI layer on live Gemini. Amazon Nova on Bedrock is the backup; it was exercised in a live Arena duel by forcing Gemini to time out, and those calls are in the console's backend log. Raw reports are in [`docs/receipts/`](docs/receipts) and every figure is reproducible with the command shown.
 
 **1. Red team, full-compromise mode** (`npm run redteam`). We assume the agent falls for every attack, then follow the money.
 
@@ -139,7 +139,7 @@ All numbers below are from real runs on 10–11 Nov 2026 against the **PayPal sa
 
 Most were stopped by the plain-code limits the human signed (quantity, per-purchase cap, payee identity), not by pattern-matching the attack text. The attacker here was a small model; a stronger one will do better, which is why the money is held until delivery instead of trusting the gate.
 
-**3. How often a real agent is fooled** (`npm run hijack`). A live `gemini-3.6-flash` shopping agent, one trial per attack: **4 of 18** pre-purchase attacks (22%) hijacked it, including the invisible-Unicode instruction and both lookalike stores. It resisted the other 14 by itself. In the Arena, the same lookalike store took **$21.24** from the unprotected agent, twice, as real sandbox captures.
+**3. How often a real agent is fooled** (`npm run hijack`). A live `gemini-3.6-flash` shopping agent, one trial per attack: **4 of 18** pre-purchase attacks (22%) hijacked it, including the invisible-Unicode instruction and both lookalike stores. It resisted the other 14 by itself. In the Arena, the same lookalike store took **$21.24** from the unprotected agent three times, as real sandbox captures.
 
 **4. Speed.** Median gate time on the 11 Nov red-team run was about 1 s (7 s on 10 Nov, when Gemini was congested), almost all of it the two AI calls running in parallel; the deterministic checks take under a millisecond and a PayPal authorization about 2 s.
 
@@ -152,13 +152,14 @@ The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 | Primitive | Where |
 |---|---|
 | Vault v3 setup token → payer approval → payment token | Signing a mandate once ([`paypal/client.ts`](server/src/paypal/client.ts)) |
-| Orders v2 `intent=AUTHORIZE` with `vault_id` + stored credential | Every agent purchase: funds held, not moved |
+| Orders v2 `intent=AUTHORIZE` | Every agent purchase: funds held, not moved. Your own mandates use the vaulted wallet (`vault_id` + stored credential); Arena and red-team runs authorize on PayPal's sandbox test card so judges don't need a login |
+| Authorizations: reauthorize | Past PayPal's 3-day honor period, a fresh authorization before capture |
 | Authorizations: capture (full, and final partial) | Verified delivery / short shipment |
-| Authorizations: void | Wrong item, the money never moved |
-| Captures: refund | Problems after capture |
+| Authorizations: void | Wrong item, or the authorization lapsed with nobody confirming (swept every 15 min) |
+| Captures: refund (full and partial) | Problems after capture; partial refunds add up and can't pass what was captured |
 | Orders: add tracking | Carrier tracking attached after capture |
-| Payouts | Seller paid only after verified delivery |
-| Transaction Search | Ledger reconciliation |
+| Payouts | Seller paid only after verified delivery; a failed payout can be retried and can't pay twice |
+| Transaction Search | Ledger view: PayPal's own record of each authorization next to Chaperone's |
 | Webhooks + signature verification | `PAYMENT.*` events on the purchase timeline |
 | `PayPal-Request-Id` on every POST | Safe retries, no double charges |
 
@@ -194,11 +195,12 @@ Agents and humans hold different keys, and the server enforces the split (`serve
 | | Agent key (MCP, any tool-using model) | Human session (the console) |
 |---|---|---|
 | Search, propose a purchase, read its status | ✓ | ✓ |
-| Approve a held purchase, confirm delivery, refund | **403** | ✓ |
+| Approve a held purchase, confirm delivery, refund, retry a payout | **403** | ✓ + passkey |
+| Loosen a mandate's limits | **403** | ✓ + passkey |
 | Sign or revoke a mandate, approve the PayPal wallet | **403** | ✓ |
 | Report a seller or carrier "delivered" claim | ✓ (can't release money) | ✓ |
 
-Try it: open a purchase that is waiting for you (it tries to approve itself), held in PayPal (it tries to confirm its own delivery) or paid (it tries to refund itself), and press **Let the agent try**. The browser sends the real request with the agent's key and shows the server's 403. Or from a terminal:
+Try it: open a purchase that is waiting for you (it tries to approve itself), held in PayPal (it tries to confirm its own delivery) or paid (it tries to issue a refund), and press **Let the agent try**. The browser sends the real request with the agent's key and shows the server's 403. Or from a terminal:
 
 ```bash
 curl -X POST https://chaperone-ku2k.onrender.com/api/purchases/<id>/decision \
@@ -206,7 +208,7 @@ curl -X POST https://chaperone-ku2k.onrender.com/api/purchases/<id>/decision \
 # {"error":"Agents can't approve or decline a held purchase. Only the human can, from their own session.","code":"agent_scope"}
 ```
 
-Human actions need the console's session cookie (HttpOnly, SameSite=Lax, HMAC-signed) and a same-origin request. Demo reset is admin-only, and duels, red-team runs and shopping runs are rate-limited per visitor so one person can't burn the shared AI quota.
+Human actions need the console's session cookie (HttpOnly, SameSite=Lax, HMAC-signed) and a same-origin request. Anything that moves money also needs a WebAuthn passkey check (Touch ID, Windows Hello, a phone or a security key) from the last 10 minutes: an agent can call every endpoint the console calls, but it can't make your authenticator sign. Responses carry a strict CSP (no third-party scripts, no framing), HSTS and nosniff. Demo reset is admin-only, and duels, red-team runs and shopping runs are rate-limited per visitor so one person can't burn the shared AI quota.
 
 ## Two AI providers
 
@@ -217,7 +219,7 @@ Gemini is the primary model for every AI step. When it is over quota, overloaded
 The web app is a live mirror of the backend, not a mockup of it. Every PayPal request, Gemini call, Channel3 search, gate decision and money movement is timed on the server (`server/src/telemetry.ts`, `server/src/paypal/instrument.ts`) and streamed to the browser over SSE.
 
 - **System map**: one box per layer, in the order the code runs them. Each real purchase flies through as a pulse along the exact path it took; counts and median timings come from the recorded checks.
-- **Trace**: pick any purchase and see its gate waterfall (the two Gemini calls run side by side) and its hash-chained timeline.
+- **Trace**: pick any purchase and see its gate waterfall (the two Gemini calls run side by side) and its hash-chained timeline (tamper-evident: editing or dropping an event breaks verification; not anchored outside this server).
 - **Where the money went**: every proposed dollar, from proposal through the gate into PayPal, captured, voided or still held.
 - **Backend log** and **provider health**: the raw call log with p50/p95 and error rate per provider. Gemini quota errors show up here as they happen, and you can watch Bedrock pick up the call.
 - **What-if replay**: in any purchase's receipts, drag its limits and the server re-runs the same deterministic gate on that exact purchase (`server/src/gate/whatif.ts`), showing which checks flip. Nothing is saved or charged.
@@ -241,15 +243,17 @@ server/src/telemetry.ts every outbound call and lifecycle step, timed and stream
 
 ## Honest limits
 
-- **"The human" is whoever has the console open.** The demo issues the human session on page load. In production that slot is the buyer's real login (PayPal Log In or a passkey); the split of powers above stays the same.
+- **"The human" is whoever has the console open, plus a passkey.** The demo issues the human session on page load; on the live site, releasing money, approving, refunding and loosening limits also need a passkey check from the last 10 minutes. There are no accounts: the passkey is tied to that browser's session. In production that slot is the buyer's real login (PayPal Log In).
 - **Money routes through Chaperone's account.** Today the hold is an Orders v2 authorization on Chaperone's own sandbox merchant, and the seller is paid with Payouts after delivery. In production this is PayPal's marketplace pattern instead: Multiparty with `payee.merchant_id` and delayed disbursement, so the capture belongs to the onboarded seller, the buyer keeps PayPal Purchase Protection with them, and Chaperone never holds the funds.
 - **The AI auditor isn't independent of the other layers.** It is shown what policy and the scanner found, so its catches overlap theirs. The quarantined reader is independent (it only sees the page). The layer counts above treat them that way.
 - **Live testing found bugs in our own checks.** On the first day against real catalog data, the gate wrongly blocked or voided correct purchases four times (wording differences, specs listed only in bullets or descriptions). Each is fixed with a regression test named for the live run that found it.
 - **The AI layer depends on rate-limited APIs.** Bedrock covers Gemini outages; if both fail, purchases wait for a human instead of passing. Safe, but slower.
+- **The test agent is primed to be gullible.** Its system prompt tells it to follow seller requirements on the page, and Arena attacks put the poisoned listing first in its results. That's on purpose: it makes the unprotected lane a worst case, so the duel shows what the gate stops, not how good the agent is.
 - **This is a self-built red team.** The attacks and the defenses come from the same author, and in "full-compromise mode" we assume the agent is fooled rather than measuring it. `npm run hijack` measures a real Gemini agent separately. The gate will miss attacks it hasn't seen; that is why the money is held until delivery instead of trusting the gate.
 - **Sellers are demo identities.** Product offers are real (Channel3), but seller payout addresses are stand-ins on a reserved domain, and "verified seller" means the seller appeared in Channel3 results. Paying real sellers needs them onboarded through PayPal's platform products (see above).
 - **Sandbox only.** No real money moves anywhere in this project.
-- **Offline mode is a simulator.** Numbers from it are labeled as such; sandbox numbers come from `npm run redteam` with keys.
+- **Offline mode is a simulator.** Numbers from it are labeled as such, and `npm run demo` starts empty (the recorded sandbox history is on the live site); sandbox numbers come from `npm run redteam` with keys.
+- **The AI reader can hold a purchase, never pass one.** If only the model thinks a description covers a requirement, the purchase waits for you; it passes only when the page states it in words plain code can verify.
 
 ## Roadmap
 

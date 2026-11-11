@@ -75,7 +75,7 @@ describe("end-to-end loop through the HTTP API (offline)", () => {
 
   it("the same attack on an unprotected agent pays the attacker immediately", async () => {
     const r = await call("POST", "/api/agent/run", { mandateId, mode: "unprotected", attackId: "A01", wait: true });
-    expect(r.json.run.steps.some((s: any) => /PAID \$/.test(s.text))).toBe(true);
+    expect(r.json.run.steps.some((s: any) => /CHARGED \$/.test(s.text))).toBe(true);
   });
 
   it("wrong item at delivery voids the authorization", async () => {
@@ -196,6 +196,16 @@ describe("who may move money", () => {
     const r = await call("POST", "/api/paypal/webhook", { id: "WH-forged", event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { custom_id: p?.id } }, "anon");
     expect(r.status).toBe(401);
     if (p) expect(JSON.stringify((await call("GET", `/api/purchases/${p.id}`)).json.purchase.timeline)).toBe(before);
+  });
+  it("pages carry a strict CSP, no framing and nosniff", async () => {
+    const r = await app.request("/api/session");
+    expect(r.headers.get("content-security-policy")).toMatch(/script-src 'self';.*frame-ancestors 'none'/);
+    expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(r.headers.get("x-frame-options")).toBe("DENY");
+  });
+  it("the agent can't retry a seller payout either", async () => {
+    const r = await call("POST", "/api/purchases/pur_x/payout", {}, "agent");
+    expect(r.status).toBe(403);
   });
   it("a spoofed X-Forwarded-For doesn't reset a rate limit", async () => {
     let last = 0;

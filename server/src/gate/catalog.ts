@@ -80,11 +80,13 @@ export function catalogChecks(intent: PurchaseIntent, facts: CatalogFacts | null
     const step = Math.max(1, Math.ceil(pts.length / 30));
     const series = pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map((h) => Math.round(h.price * 100) / 100);
     const over = Math.round(((l.price - st.max_price) / st.max_price) * 1000) / 10;
+    // Far below anything it has sold for is a bait signal (counterfeit, used, or a listing that never ships).
+    const under = st.min_price > 0 ? Math.round(((st.min_price - l.price) / st.min_price) * 1000) / 10 : 0;
     checks.push({
       stage: "market",
       rule: "market.price_history",
-      outcome: over > 25 ? "fail" : over > 5 ? "warn" : "pass",
-      title: over > 5 ? `${over}% above its 90-day high` : `Within its ${pts.length}-day price range`,
+      outcome: over > 25 ? "fail" : over > 5 || under > 35 ? "warn" : "pass",
+      title: over > 5 ? `${over}% above its 90-day high` : under > 35 ? `${under}% below its 90-day low: too cheap to trust` : `Within its ${pts.length}-day price range`,
       detail: `Channel3's history: $${st.min_price.toFixed(2)}–$${st.max_price.toFixed(2)}, typical $${st.mean.toFixed(2)}, today rated "${st.current_status}". This purchase: $${l.price.toFixed(2)}.`,
       data: { min: st.min_price, max: st.max_price, mean: Math.round(st.mean * 100) / 100, status: st.current_status, days: pts.length, series: series.join(","), price: l.price },
     });

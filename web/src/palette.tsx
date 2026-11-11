@@ -34,7 +34,8 @@ export function Palette({ commands, onClose }: { commands: Command[]; onClose: (
   const shown = useMemo(
     () =>
       commands
-        .map((c) => ({ c, s: Math.max(score(q, c.label), score(q, c.hint ?? "") * 0.6, score(q, c.group) * 0.3) }))
+        // Duels spend shared AI quota and start real runs, so they rank below looking things up.
+        .map((c) => ({ c, s: Math.max(score(q, c.label), score(q, c.hint ?? "") * 0.6, score(q, c.group) * 0.3) * (c.group === "Run a duel" ? 0.55 : 1) }))
         .filter((x) => x.s > 0)
         .sort((a, b) => (q ? b.s - a.s : 0))
         .slice(0, 40)

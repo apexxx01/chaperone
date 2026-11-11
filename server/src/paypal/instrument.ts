@@ -8,6 +8,7 @@ const NAMES: Record<string, string> = {
   authorize: "POST /v2/checkout/orders (AUTHORIZE, + /authorize when needed)",
   capture: "POST /v2/payments/authorizations/:id/capture",
   void: "POST /v2/payments/authorizations/:id/void",
+  reauthorize: "POST /v2/payments/authorizations/:id/reauthorize",
   refund: "POST /v2/payments/captures/:id/refund",
   addTracking: "POST /v2/checkout/orders/:id/track",
   payout: "POST /v1/payments/payouts",

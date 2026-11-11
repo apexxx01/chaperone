@@ -47,6 +47,9 @@ describe("Channel3 catalog truth", () => {
     expect(run("monoprice.com", 24.99).find((x) => x.rule === "market.price_history")!.outcome).toBe("pass");
     expect(run("monoprice.com", 28).find((x) => x.rule === "market.price_history")!.outcome).toBe("pass");
     expect(catalogChecks(intent("monoprice.com", 45), { product, history, ms: 1 }, new Map(), 100).find((x) => x.rule === "market.price_history")!.outcome).toBe("fail");
+    const bait = run("monoprice.com", 9.99).find((x) => x.rule === "market.price_history")!;
+    expect(bait.outcome).toBe("warn");
+    expect(bait.title).toMatch(/below its 90-day low/);
   });
   it("offers no alternative above the cap", () => {
     expect(run("amaz0n.com", 21.24, 20).find((x) => x.rule === "market.catalog_seller")!.data?.altDomain).toBeUndefined();

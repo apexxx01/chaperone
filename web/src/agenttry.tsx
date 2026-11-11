@@ -14,7 +14,7 @@ export function AgentTry({ p }: { p: Purchase }) {
       : p.state === "awaiting_delivery"
         ? { label: "confirm its own delivery", path: `/api/purchases/${p.id}/delivery`, body: { scenario: "as_ordered", source: "buyer" } }
         : p.state === "seller_paid" || p.state === "captured"
-          ? { label: "refund it to itself", path: `/api/purchases/${p.id}/refund`, body: { reason: "agent says the user wants a refund" } }
+          ? { label: "issue a refund on its own", path: `/api/purchases/${p.id}/refund`, body: { reason: "agent says the user wants a refund" } }
           : null;
   if (!move) return null;
   const go = async () => {

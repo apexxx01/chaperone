@@ -116,8 +116,9 @@ export async function audit(args: {
   intent: PurchaseIntent;
   market?: MarketStats | null;
   deterministic: Check[];
-  flags: ReaderFlags;
   findings: Finding[];
+  /** Channel3's own title for this product, when the catalog knows it. Seller-written titles are never trusted over it. */
+  canonicalTitle?: string | null;
 }): Promise<{ result: AuditResult; source: string; ms: number }> {
   const t0 = performance.now();
   const { mandate: m, intent: it } = args;
@@ -125,12 +126,12 @@ export async function audit(args: {
     return { result: heuristicAudit(args), source: "heuristic", ms: performance.now() - t0 };
   }
   const failed = args.deterministic.filter((c) => c.outcome !== "pass").map((c) => `${c.outcome.toUpperCase()} ${c.rule}: ${c.title}`);
-  const raised = FLAG_KEYS.filter((k) => args.flags[k]);
   const facts = {
     human_instruction: m.instruction,
     mandate: { item: m.item.description, must_have: m.item.mustHave, max_quantity: m.item.maxQuantity, max_per_purchase: m.budget.maxPerPurchase },
     purchase: {
-      product_title: sanitize(it.listing.title).slice(0, 140),
+      product_title: sanitize(args.canonicalTitle || it.listing.title).slice(0, 140),
+      title_source: args.canonicalTitle ? "channel3_catalog" : "seller_listing",
       brand: it.listing.brand ?? null,
       seller_domain: it.listing.merchant.domain,
       unit_price: it.listing.price,
@@ -139,7 +140,6 @@ export async function audit(args: {
     },
     market: args.market ? { median: args.market.median, offers: args.market.offers } : null,
     deterministic_issues: failed,
-    page_manipulation_flags: raised,
     scanner_findings: args.findings.map((f) => `${f.severity} ${f.kind}`),
   };
   const { value: ans, hit: auditHit } = await cached(`auditor|${JSON.stringify(facts)}`, () =>
@@ -173,9 +173,8 @@ export function heuristicFlags(text: string): ReaderFlags {
   };
 }
 
-function heuristicAudit(args: { deterministic: Check[]; flags: ReaderFlags; findings: Finding[] }): AuditResult {
+function heuristicAudit(args: { deterministic: Check[]; findings: Finding[] }): AuditResult {
   const fails = args.deterministic.filter((c) => c.outcome === "fail");
-  const raised = FLAG_KEYS.filter((k) => args.flags[k] && k !== "pressureTactics");
   const high = args.findings.filter((f) => f.severity === "high");
   const concerns = new Set<string>();
   for (const f of fails) {
@@ -185,7 +184,7 @@ function heuristicAudit(args: { deterministic: Check[]; flags: ReaderFlags; find
     if (f.rule.includes("requirements")) concerns.add("requirement_missing");
     if (f.rule.includes("merchant")) concerns.add("untrusted_seller");
   }
-  if (raised.length || high.length) concerns.add("page_manipulation");
+  if (high.length) concerns.add("page_manipulation");
   const aligned = concerns.size === 0;
   return {
     aligned,
