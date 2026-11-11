@@ -12,7 +12,7 @@ import { BedrockRuntimeClient, ConverseCommand, type ContentBlock, type Message,
 import type { Content, FunctionDeclaration, Part } from "@google/genai";
 import { timed } from "../telemetry.ts";
 
-export const BEDROCK_MODEL = process.env.BEDROCK_MODEL ?? "us.amazon.nova-pro-v1:0";
+export const BEDROCK_MODEL = process.env.BEDROCK_MODEL ?? "us.amazon.nova-2-lite-v1:0";
 export const BEDROCK_FAST_MODEL = process.env.BEDROCK_FAST_MODEL ?? "us.amazon.nova-lite-v1:0";
 const REGION = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1";
 const TIMEOUT_MS = Number(process.env.BEDROCK_TIMEOUT_MS ?? 20000);
