@@ -23,7 +23,7 @@ const norm = (d: string) => d.toLowerCase().replace(/^www\./, "");
 export function catalogChecks(intent: PurchaseIntent, facts: CatalogFacts | null, registry: Map<string, Merchant>, maxPerPurchase: number): Check[] {
   if (!facts) return [];
   const ms = Math.round(facts.ms);
-  if (facts.error) return [{ stage: "market", rule: "market.catalog_unavailable", outcome: "pass", title: "Channel3 catalog unreachable, skipped", detail: `The other layers still ran. (${facts.error.slice(0, 120)})`, ms }];
+  if (facts.error) return [{ stage: "market", rule: "market.catalog_unavailable", outcome: "warn", title: "Couldn't check Channel3's catalog", detail: `Without it, nobody confirmed this seller really sells this product, so you decide. (${facts.error.slice(0, 120)})`, ms }];
   const p = facts.product;
   const l = intent.listing;
   if (!p) return [{ stage: "market", rule: "market.catalog_unknown", outcome: "warn", title: "Product isn't in Channel3's catalog", detail: `Channel3 has no record of product ${l.productId}. A real product sold by real retailers usually is.`, ms }];

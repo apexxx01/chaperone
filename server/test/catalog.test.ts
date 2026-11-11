@@ -53,7 +53,7 @@ describe("Channel3 catalog truth", () => {
   });
   it("skips quietly when Channel3 is unreachable, and adds nothing offline", () => {
     const c = catalogChecks(intent("monoprice.com", 24.99), { product: null, history: null, ms: 0, error: "timeout" }, new Map(), 50);
-    expect(c[0]!.outcome).toBe("pass");
+    expect(c[0]!.outcome).toBe("warn");
     expect(catalogChecks(intent("monoprice.com", 24.99), null, new Map(), 50)).toEqual([]);
   });
 });

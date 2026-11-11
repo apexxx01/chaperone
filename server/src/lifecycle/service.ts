@@ -179,7 +179,17 @@ export class Chaperone {
       this.event(p, "delivered", `${report.source === "buyer" ? "You reported what arrived" : report.source === "seller" ? "Seller says it was delivered" : "Carrier scan"}${report.carrier ? ` (${report.carrier} ${report.trackingNumber ?? ""})` : ""}`, report.manifest.map((i) => `${i.quantity}× ${i.title}`).join(", "));
       this.store.savePurchase(p);
 
-      const { verdict, settlement } = await verifyDelivery(m, p, report, photo);
+      let checked: Awaited<ReturnType<typeof verifyDelivery>>;
+      try {
+        checked = await verifyDelivery(m, p, report, photo);
+      } catch (e) {
+        // Fail closed: the money stays held and the report can be sent again.
+        p.state = "awaiting_delivery";
+        this.event(p, "error", "Couldn't check the delivery. Funds stay held; send the report again", explain(e));
+        this.store.savePurchase(p);
+        throw new LifecycleError(`Couldn't check the delivery right now (${explain(e)}). Nothing moved; try again.`, 503);
+      }
+      const { verdict, settlement } = checked;
       p.deliveryVerdict = verdict;
       this.event(p, "verified", "Delivery check", verdict.headline, verdict.ms);
 

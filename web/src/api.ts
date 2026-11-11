@@ -44,8 +44,20 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
     await fetch("/api/session").catch(() => {});
     return api<T>(method, path, body, true);
   }
+  // Money actions need a person: ask for the passkey, then send the same request again.
+  if (res.status === 401 && json.code === "passkey_required" && !retried) {
+    const ok = await askForPasskey(json.error, !!json.registered);
+    if (!ok) throw new ApiError("Cancelled: nothing moved.");
+    return api<T>(method, path, body, true);
+  }
   if (!res.ok) throw new ApiError(json.error ?? `Request failed (${res.status})`);
   return json as T;
+}
+
+/** The app shell renders the passkey dialog; api() waits on it. */
+export interface PasskeyAsk { why: string; registered: boolean; resolve: (ok: boolean) => void }
+export function askForPasskey(why: string, registered: boolean): Promise<boolean> {
+  return new Promise((resolve) => window.dispatchEvent(new CustomEvent<PasskeyAsk>("chaperone:passkey", { detail: { why, registered, resolve } })));
 }
 
 /** Full state on load, then live patches over SSE. Reconnects with backoff and resyncs on reconnect. */

@@ -991,3 +991,13 @@ input[type="file"]::file-selector-button:hover { border-color: var(--ink); }
 .c3-alt span { font-size: 12px; }
 .c3-alt .btn { flex: none; }
 @media (max-width: 560px) { .c3-alt { flex-direction: column; align-items: stretch; } }
+
+/* ── Passkey dialog ───────────────────────────────── */
+.pk-back { position: fixed; inset: 0; z-index: 75; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--bg) 62%, transparent); backdrop-filter: blur(8px); }
+.pk { width: min(440px, 100%); display: grid; gap: 10px; justify-items: start; padding: 24px; border-radius: 18px; border: 1px solid var(--line-3); background: var(--panel); box-shadow: var(--shadow); }
+.pk-icon { color: var(--ink); margin-bottom: 4px; animation: breathe 2.4s var(--ease) infinite; }
+.pk h2 { font-size: 20px; letter-spacing: -0.03em; }
+.pk p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+.pk p.faint { color: var(--ink-3); font-size: 12.5px; }
+.pk-err { color: var(--red) !important; }
+.pk-row { display: flex; gap: 8px; justify-content: flex-end; width: 100%; margin-top: 8px; }

@@ -185,8 +185,10 @@ export async function verifyDelivery(mandate: Mandate, p: Purchase, d: DeliveryR
 
   const fails = checks.filter((c) => c.outcome === "fail");
   let settlement: Settlement;
-  if (fails.length) settlement = { action: "void", reason: fails[0]!.title };
-  else if (d.source !== "buyer") settlement = { action: "await_buyer", reason: d.source === "seller" ? "Only the seller says it was delivered" : "Carrier scan only" };
+  // Only the buyer's own report moves money in either direction. A seller or carrier report, even one
+  // that says the item is wrong, just waits for the buyer: otherwise anyone could void anyone's order.
+  if (d.source !== "buyer") settlement = { action: "await_buyer", reason: fails.length ? `${d.source === "seller" ? "The seller's" : "The carrier's"} report doesn't match (${fails[0]!.title}); only you can decide` : d.source === "seller" ? "Only the seller says it was delivered" : "Carrier scan only" };
+  else if (fails.length) settlement = { action: "void", reason: fails[0]!.title };
   else if (photoUnclear) settlement = { action: "await_buyer", reason: "The photo doesn't clearly show the item" };
   else if (units < wanted) settlement = { action: "capture_partial", amount: round2(unit * units), units };
   else settlement = { action: "capture_full", amount: p.amount.value };

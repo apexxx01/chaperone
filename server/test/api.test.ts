@@ -183,8 +183,60 @@ describe("who may move money", () => {
     const r = await call("POST", "/api/purchases/nope/delivery", { scenario: "as_ordered", source: "seller" }, "agent");
     expect(r.status).toBe(404);
   });
-  it("reset is admin only", async () => {
+  it("anonymous callers can't propose, search or read the merchant ledger", async () => {
+    expect((await call("POST", "/api/purchases", { mandateId: "x" }, "anon")).status).toBe(401);
+    expect((await call("GET", "/api/search?q=charger", undefined, "anon")).status).toBe(401);
+    expect((await call("GET", "/api/paypal/transactions", undefined, "anon")).status).toBe(401);
+    expect((await call("GET", "/api/paypal/transactions", undefined, "agent")).status).toBe(403);
+  });
+  it("unsigned PayPal webhooks are rejected and change nothing", async () => {
+    const s = (await call("GET", "/api/state")).json;
+    const p = s.purchases[0];
+    const before = p ? JSON.stringify(p.timeline) : "";
+    const r = await call("POST", "/api/paypal/webhook", { id: "WH-forged", event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { custom_id: p?.id } }, "anon");
+    expect(r.status).toBe(401);
+    if (p) expect(JSON.stringify((await call("GET", `/api/purchases/${p.id}`)).json.purchase.timeline)).toBe(before);
+  });
+  it("a spoofed X-Forwarded-For doesn't reset a rate limit", async () => {
+    let last = 0;
+    for (let i = 0; i < 125; i++) {
+      const res = await app.request("/api/purchases/nope/whatif", { method: "POST", headers: { "Content-Type": "application/json", Cookie: await session(), "X-Forwarded-For": `10.0.0.${i % 250}, 203.0.113.7` }, body: "{}" });
+      last = res.status;
+    }
+    expect(last).toBe(429);
+  });
+  it("reset is admin only, and a forged host header doesn't make you admin", async () => {
     const res = await app.request("http://chaperone.example/api/demo/reset", { method: "POST", headers: { Cookie: await session() } });
     expect(res.status).toBe(403);
+    const forged = await app.request("http://localhost/api/demo/reset", { method: "POST", headers: { Cookie: await session(), "X-Forwarded-Host": "localhost" } });
+    expect(forged.status).toBe(403);
+  });
+});
+
+describe("passkey step-up", () => {
+  it("with passkeys on, a human session alone can't release money; the agent can't even start a passkey check", async () => {
+    process.env.CHAPERONE_PASSKEYS = "on";
+    try {
+      for (const [m, path, body] of [
+        ["POST", "/api/purchases/x/decision", { decision: "approve" }],
+        ["POST", "/api/purchases/x/delivery", { scenario: "as_ordered", source: "buyer" }],
+        ["POST", "/api/purchases/x/refund", { reason: "r" }],
+        ["PATCH", "/api/mandates/x", { maxPerPurchase: 9999 }],
+      ] as const) {
+        const r = await call(m, path, body);
+        expect(r.status, path).toBe(401);
+        expect(r.json.code, path).toBe("passkey_required");
+      }
+      expect((await call("POST", "/api/passkey/register/options", {}, "agent")).status).toBe(403);
+      expect((await call("POST", "/api/passkey/auth/options", {}, "anon")).status).toBe(401);
+      const opts = await call("POST", "/api/passkey/register/options", {});
+      expect(opts.status).toBe(200);
+      expect(opts.json.authenticatorSelection.userVerification).toBe("required");
+      const fake = await call("POST", "/api/passkey/register/verify", { id: "x", rawId: "x", type: "public-key", response: { clientDataJSON: "e30", attestationObject: "AA" }, clientExtensionResults: {} });
+      expect(fake.status).toBe(400);
+      expect((await call("POST", "/api/purchases/x/decision", { decision: "approve" })).json.code).toBe("passkey_required");
+    } finally {
+      delete process.env.CHAPERONE_PASSKEYS;
+    }
   });
 });

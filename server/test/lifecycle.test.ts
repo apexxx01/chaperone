@@ -72,10 +72,21 @@ describe("purchase lifecycle", () => {
     expect(scanned.state).toBe("awaiting_delivery");
     expect(pp.captures.size).toBe(0);
   });
-  it("a seller admitting a different item still voids", async () => {
+  it("a seller or carrier saying the item is wrong can't void: only the buyer moves money either way", async () => {
     const p = await ch.propose(intent());
-    const done = await ch.deliver(p.id, { source: "seller", receivedAt: new Date().toISOString(), manifest: [{ title: "30W USB-C Fast Charger Block", quantity: 1, attributes: { wattage: "30W" } }] });
-    expect(done.state).toBe("voided");
+    const wrong = { receivedAt: new Date().toISOString(), manifest: [{ title: "30W USB-C Fast Charger Block", quantity: 1, attributes: { wattage: "30W" } }] };
+    expect((await ch.deliver(p.id, { ...wrong, source: "seller" })).state).toBe("awaiting_delivery");
+    expect((await ch.deliver(p.id, { ...wrong, source: "carrier" })).state).toBe("awaiting_delivery");
+    expect((await ch.deliver(p.id, { ...wrong, source: "buyer" })).state).toBe("voided");
+  });
+  it("a delivery check that can't run leaves the money held and the report retryable", async () => {
+    const p = await ch.propose(intent());
+    const d = await import("../src/lifecycle/delivery.ts");
+    const spy = (await import("vitest")).vi.spyOn(d, "verifyDelivery").mockRejectedValueOnce(new Error("503 both AI providers down"));
+    await expect(ch.deliver(p.id, delivered())).rejects.toThrow(/Nothing moved/);
+    expect(ch.purchase(p.id).state).toBe("awaiting_delivery");
+    spy.mockRestore();
+    expect((await ch.deliver(p.id, delivered())).state).toBe("seller_paid");
   });
   it("captures only what arrived on a short shipment", async () => {
     store.mandates.get("md")!.item.maxQuantity = 2;

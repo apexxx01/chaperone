@@ -1,10 +1,11 @@
+import { config } from "../config.ts";
 import { timed } from "../telemetry.ts";
 import type { PayPalApi } from "./types.ts";
 
 const NAMES: Record<string, string> = {
   createSetupToken: "POST /v3/vault/setup-tokens",
   createPaymentToken: "POST /v3/vault/payment-tokens",
-  authorize: "POST /v2/checkout/orders (AUTHORIZE)",
+  authorize: "POST /v2/checkout/orders (AUTHORIZE, + /authorize when needed)",
   capture: "POST /v2/payments/authorizations/:id/capture",
   void: "POST /v2/payments/authorizations/:id/void",
   refund: "POST /v2/payments/captures/:id/refund",
@@ -23,6 +24,8 @@ export function instrument(api: PayPalApi): PayPalApi {
       if (prop === "__instrumented") return true;
       const v = Reflect.get(target, prop, recv);
       if (typeof v !== "function" || !(String(prop) in NAMES)) return v;
+      // No webhook id configured means no HTTP call is made, so don't log one.
+      if (prop === "verifyWebhook" && target.kind === "sandbox" && !config.paypal.webhookId) return v.bind(target);
       return (...args: unknown[]) =>
         timed("paypal", NAMES[String(prop)]!, () => (v as (...a: unknown[]) => Promise<unknown>).apply(target, args), (r) => {
           const o = r as Record<string, unknown>;

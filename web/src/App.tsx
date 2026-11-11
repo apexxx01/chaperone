@@ -8,6 +8,7 @@ import { ConsoleView } from "./console.tsx";
 import { EvidenceView } from "./evidence.tsx";
 import { Palette, type Command } from "./palette.tsx";
 import { Tour, type TourStep } from "./tour.tsx";
+import { PasskeyGate } from "./passkey.tsx";
 import { fmtMs, Icon, Kbd, useNow, type Scope } from "./ui.tsx";
 import { HowView, MandatesView, NowView, RedTeamView } from "./views.tsx";
 
@@ -316,6 +317,7 @@ export function App() {
         <AnimatePresence>{open && <Drawer key={open.id} p={open} onClose={() => setOpenId(undefined)} notify={notify} />}</AnimatePresence>
         <AnimatePresence>{palette && <Palette commands={commands} onClose={() => setPalette(false)} />}</AnimatePresence>
         {touring && tourSteps.length > 0 && <Tour steps={tourSteps} onClose={endTour} />}
+        <PasskeyGate />
 
         <div className="toasts" aria-live="polite">
           <AnimatePresence>

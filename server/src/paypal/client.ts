@@ -188,7 +188,7 @@ export class PayPalSandbox implements PayPalApi {
       transmission_time: headers["paypal-transmission-time"],
       webhook_id: config.paypal.webhookId,
       webhook_event: body,
-    });
+    }, { requestId: `vw-${headers["paypal-transmission-id"] ?? Date.now()}` });
     return r.verification_status === "SUCCESS";
   }
 }

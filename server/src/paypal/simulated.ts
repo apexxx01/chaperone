@@ -120,7 +120,8 @@ export class PayPalSimulated implements PayPalApi {
     return { count: items.length, items };
   }
 
-  async verifyWebhook() {
-    return true;
+  /** The simulator signs its own events with a fixed header; anything else is a forgery. */
+  async verifyWebhook(headers: Record<string, string>) {
+    return headers["paypal-transmission-sig"] === "chaperone-simulator";
   }
 }
