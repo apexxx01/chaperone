@@ -239,7 +239,7 @@ export function Pipeline({ purchases, replay, caption = true, compact = false }:
                 <g key={n.id} className={`node diamond${lit(n.id)}${hover === n.id ? " hov" : ""}`} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} tabIndex={0} onFocus={() => setHover(n.id)}>
                   <path d={`M${x},${CY - 20} L${x + 20},${CY} L${x},${CY + 20} L${x - 20},${CY} Z`} className="node-box" />
                   <text x={x} y={CY - 30} className="n-title" textAnchor="middle">Decide</text>
-                  <text x={x + 24} y={CY - 7} className="n-ms">{stats.ms.decide}</text>
+                  <text x={x} y={CY - 44} className="n-ms" textAnchor="middle">{stats.ms.decide}</text>
                 </g>
               );
             }
@@ -265,7 +265,7 @@ export function Pipeline({ purchases, replay, caption = true, compact = false }:
                     <text x={n.x + 10} y={y + 46} className="n-num">{n.id === "hold" ? usd(stats.held).replace(".00", "") : n.id === "paid" ? usd(stats.paid).replace(".00", "") : reached}</text>
                     {n.id !== "agent" && <text x={n.x + 2} y={y + h + 13} className="n-ms">{stats.ms[n.id]}</text>}
                     {stop > 0 && <text x={n.x + n.w - 10} y={y + 46} className="n-stop" textAnchor="end">−{stop}</text>}
-                    <text x={n.x + 10} y={y + h - 8} className="n-sub">{n.id === "agent" ? "proposals" : n.id === "hold" ? `${reached} reached` : n.id === "paid" ? `${reached} paid out` : stop ? `${reached} in · ${stop} stopped` : `${reached} in`}</text>
+                    <text x={n.x + 10} y={y + h - 8} className="n-sub">{n.id === "agent" ? "proposals" : n.id === "hold" ? `${reached} authorized` : n.id === "paid" ? `${reached} paid out` : stop ? `${reached} in · ${stop} stopped` : `${reached} in`}</text>
                   </>
                 )}
               </g>

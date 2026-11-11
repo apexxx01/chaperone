@@ -53,7 +53,7 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
         {rt && (
           <div className="hero-stat" title="Red team in full-compromise mode: every attack is assumed to fool the agent, then run through PayPal's sandbox both ways.">
             <div className="hs-row bad">
-              <span>Agent alone, {rt.attacks} attacks</span>
+              <span>Agent alone, if it falls for all {rt.attacks} attacks</span>
               <b className="num">−<Num value={rt.unprotectedDollarsMoved} money /></b>
             </div>
             <div className="hs-row">
@@ -61,7 +61,8 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
               <b className="num"><Num value={rt.protectedDollarsMovedWrongly} money /></b>
             </div>
             <div className="hs-foot faint num">
-              {rt.stoppedAtGate} blocked at the gate · {rt.caughtAfterPurchase} caught at delivery · {rt.benignCompleted}/{rt.benign} honest buys went through
+              Red team in PayPal's sandbox, agent assumed fooled: {rt.stoppedAtGate} blocked at the gate · {rt.caughtAfterPurchase} caught at delivery · {rt.benignCompleted}/{rt.benign} honest buys went through.
+              {s.arena.stats.aloneLost > 0 && <> Measured live in the Arena: the lone agent was actually robbed of {usd(s.arena.stats.aloneLost)}; through Chaperone, {usd(s.arena.stats.capturedThroughChaperone)}.</>}
             </div>
           </div>
         )}
@@ -232,7 +233,7 @@ function Table({ ps, sel, setSel, open, now }: { ps: Purchase[]; sel?: string; s
                   <td>
                     <StateTag state={p.state} />
                   </td>
-                  <td className="t-why">{c?.title ?? <span className="faint">every check passed</span>}</td>
+                  <td className="t-why" title={c?.title}>{c?.title ?? <span className="faint">every check passed</span>}</td>
                   <td className="num r faint">{fmtMs(p.verdict.ms)}</td>
                 </motion.tr>
               );

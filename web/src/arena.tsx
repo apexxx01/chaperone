@@ -18,7 +18,12 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
   const now = useNow(1000);
   const arenaPs = useMemo(() => s.purchases.filter((p) => p.intent.mandateId.startsWith("md_arena_")), [s.purchases]);
   const arenaIds = useMemo(() => new Set(arenaPs.map((p) => p.id)), [arenaPs]);
-  const arenaLines = useMemo(() => lines.filter((l) => l.provider === "agent" || (l.ref && arenaIds.has(l.ref)) || /duel|arena/i.test(l.op)), [lines, arenaIds]);
+  // Outbound calls carry no purchase ref, so take everything the backend logged while a duel was running.
+  const windows = useMemo(() => s.duels.map((d) => [Date.parse(d.at) - 500, d.status === "running" ? Infinity : Date.parse(d.at) + (d.ms ?? 120_000) + 2000] as const), [s.duels]);
+  const arenaLines = useMemo(() => lines.filter((l) => {
+    const t = Date.parse(l.at);
+    return (l.ref && arenaIds.has(l.ref)) || windows.some(([a, b]) => t >= a && t <= b);
+  }), [lines, arenaIds, windows]);
   const [task, setTask] = useState<"charger" | "headphones">("charger");
   const [mode, setMode] = useState<"library" | "custom">("library");
   const [attackId, setAttackId] = useState(s.arena.attacks[0]?.id ?? "A01");
@@ -34,6 +39,12 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
   // Until the visitor picks or runs one, show a live duel if there is one, else the most recent where the agent was actually fooled.
   const duel = (focus ? s.duels.find((d) => d.id === focus) : undefined) ?? s.duels.find((d) => d.status === "running") ?? s.duels.find((d) => d.verdict === "caught") ?? s.duels.find((d) => d.alone.fooled) ?? s.duels[0];
   const running = s.duels.some((d) => d.status === "running");
+  // The picker starts on the attack of the duel being shown, so the page tells one story.
+  const shownAttack = duel?.attack.custom ? undefined : duel?.attack.id;
+  const [picked, setPicked] = useState(false);
+  useEffect(() => {
+    if (!picked && shownAttack && s.arena.attacks.some((a) => a.id === shownAttack)) setAttackId(shownAttack);
+  }, [shownAttack, picked, s.arena.attacks]);
   useEffect(() => {
     if (running) setBusy(false);
   }, [running]);
@@ -92,7 +103,7 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
         {mode === "library" ? (
           <div className="field">
             <label htmlFor="lib">Attack</label>
-            <select id="lib" className="input" value={attackId} onChange={(e) => setAttackId(e.target.value)}>
+            <select id="lib" className="input" value={attackId} onChange={(e) => (setPicked(true), setAttackId(e.target.value))}>
               {s.arena.attacks.map((a) => <option key={a.id} value={a.id}>{a.id} {a.name}</option>)}
             </select>
             {chosen && <span className="faint" style={{ fontSize: 14 }}>{chosen.technique}</span>}
@@ -141,7 +152,7 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
         <section className="section">
           <div className="section-head"><h2>Earlier duels</h2><p>Robberies first. A capable model often resists on its own; the point is what happens on the runs where it doesn't.</p></div>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table duels">
               <thead><tr><th>Attack</th><th>Agent alone</th><th>With Chaperone</th><th>Result</th></tr></thead>
               <tbody>
                 {s.duels

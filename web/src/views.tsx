@@ -112,8 +112,9 @@ function AgentPanel({ s, notify }: { s: AppState; notify: Notify }) {
   const [mode, setMode] = useState<"protected" | "unprotected">("protected");
   const [attack, setAttack] = useState("");
   const [busy, setBusy] = useState(false);
-  const chosen = active.find((m) => m.id === mandateId) ?? active[0];
-  const run = s.runs.find((r) => r.mandateId === chosen?.id) ?? s.runs[0];
+  const latestJob = active.find((m) => s.runs.some((r) => r.mandateId === m.id && r.mode !== "unprotected")) ?? active[0];
+  const chosen = active.find((m) => m.id === mandateId) ?? latestJob;
+  const run = s.runs.find((r) => r.mandateId === chosen?.id);
 
   const start = async () => {
     if (!chosen) return;

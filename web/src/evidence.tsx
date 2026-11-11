@@ -239,7 +239,7 @@ export function EvidenceView({ s, children }: { s: AppState; children?: React.Re
     e.fooled += (d.alone.fooled ? 1 : 0) + (d.guarded.fooled ? 1 : 0);
     byAttack.set(k, e);
   }
-  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: e.name, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} agent runs fell for it. Small sample` }));
+  const hijack = [...byAttack.values()].sort((a, b) => b.fooled / b.runs - a.fooled / a.runs).map((e) => ({ label: `${e.name} (${e.fooled}/${e.runs})`, value: Math.round((e.fooled / e.runs) * 100), hint: `${e.fooled} of ${e.runs} agent runs fell for it. Small sample` }));
 
   const blocked = ps.filter((p) => p.state === "blocked").length;
   const st = s.arena.stats;

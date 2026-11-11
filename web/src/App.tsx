@@ -39,6 +39,17 @@ export function App() {
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
   const [touring, setTouring] = useState(() => new URLSearchParams(location.search).has("tour"));
+  // First visit on a desktop: start the tour once, after the page has drawn. Closing it (Esc) ends it for good.
+  useEffect(() => {
+    let seen = true;
+    try {
+      seen = localStorage.getItem("chaperone.toured") === "1";
+    } catch {}
+    const q = new URLSearchParams(location.search);
+    if (seen || q.has("paypal") || q.has("notour") || innerWidth < 1000 || (location.hash && location.hash !== "#console")) return;
+    const t = setTimeout(() => setTouring(true), 1800);
+    return () => clearTimeout(t);
+  }, []);
   const [toured, setToured] = useState(() => {
     try {
       return localStorage.getItem("chaperone.toured") === "1";

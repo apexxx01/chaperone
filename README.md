@@ -3,7 +3,7 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-124%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-125%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
@@ -164,7 +164,7 @@ Agents and humans hold different keys, and the server enforces the split (`serve
 | Sign or revoke a mandate, approve the PayPal wallet | **403** | ✓ |
 | Report a seller or carrier "delivered" claim | ✓ (can't release money) | ✓ |
 
-Try it: open any held purchase and press **Let the agent try**. The browser sends the real request with the agent's key and shows the server's 403. Or from a terminal:
+Try it: open a purchase that is waiting for you (it tries to approve itself), held in PayPal (it tries to confirm its own delivery) or paid (it tries to refund itself), and press **Let the agent try**. The browser sends the real request with the agent's key and shows the server's 403. Or from a terminal:
 
 ```bash
 curl -X POST https://chaperone-ku2k.onrender.com/api/purchases/<id>/decision \

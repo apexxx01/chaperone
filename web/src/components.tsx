@@ -170,7 +170,7 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
         )}
 
         <section className="section" style={{ marginTop: 24 }}>
-          <h3 style={{ marginBottom: 10 }}>Why ({p.verdict.checks.length} checks, {p.verdict.ms} ms)</h3>
+          <h3 style={{ marginBottom: 10 }}>Why ({p.verdict.checks.length} checks, {p.verdict.ms.toLocaleString()} ms{p.verdict.checks.some((c) => String(c.data?.source ?? "").includes("cached")) ? ", AI answers reused from an identical earlier page" : ""})</h3>
           <div className="checks">{sorted.map((c, i) => <CheckRow key={i} c={c} />)}</div>
         </section>
 
