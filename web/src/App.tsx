@@ -209,7 +209,7 @@ export function App() {
   const heldCount = state.purchases.filter((p) => p.state === "held" && !/^md_(arena|rt)_/.test(p.intent.mandateId)).length;
   const open = state.purchases.find((p) => p.id === openId);
   const here = TABS.find((t) => t.id === tab)!;
-  const up = (id: "paypal" | "gemini" | "channel3", on: boolean) => {
+  const up = (id: "paypal" | "gemini" | "bedrock" | "channel3", on: boolean) => {
     const h = health.find((x) => x.id === id)!;
     const err = h.recent.slice(-5).filter((l) => !l.ok).length;
     return { on, h, cls: !on ? "off" : err >= 3 ? "down" : err ? "warn" : "ok" };
@@ -217,6 +217,7 @@ export function App() {
   const status = [
     { name: "PayPal", sub: caps.paypalClient === "sandbox" ? "sandbox" : "simulator", ...up("paypal", true) },
     { name: "Gemini", sub: caps.gemini ? "live" : "offline", ...up("gemini", caps.gemini) },
+    ...(caps.bedrock ? [{ name: "Bedrock", sub: "standby", ...up("bedrock", true) }] : []),
     { name: "Channel3", sub: caps.channel3 ? "live" : "fixtures", ...up("channel3", caps.channel3) },
   ];
 

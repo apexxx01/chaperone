@@ -34,6 +34,8 @@ export function capabilities() {
     paypal: !offline && !!config.paypal.clientId && !!config.paypal.clientSecret,
     gemini: !offline && !!config.geminiKey,
     channel3: !offline && !!config.channel3Key,
+    /** Backup AI provider (Amazon Nova on Bedrock) used when Gemini can't answer. */
+    bedrock: !offline && !!config.geminiKey && !process.env.BEDROCK_DISABLED && Boolean((process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || process.env.AWS_PROFILE || process.env.AWS_BEARER_TOKEN_BEDROCK),
     paypalEnv: config.paypal.env,
     paymentMode: config.paypal.paymentMode,
   };

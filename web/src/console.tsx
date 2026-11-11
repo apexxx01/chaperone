@@ -253,6 +253,7 @@ const SOURCES = [
   { id: "all", label: "All" },
   { id: "paypal", label: "PayPal" },
   { id: "gemini", label: "Gemini" },
+  { id: "bedrock", label: "Bedrock" },
   { id: "channel3", label: "Channel3" },
   { id: "gate", label: "Gate" },
   { id: "lifecycle", label: "Money" },

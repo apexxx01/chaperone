@@ -5,7 +5,7 @@
  */
 import { EventEmitter } from "node:events";
 
-export type Provider = "paypal" | "gemini" | "channel3" | "gate" | "lifecycle" | "agent";
+export type Provider = "paypal" | "gemini" | "bedrock" | "channel3" | "gate" | "lifecycle" | "agent";
 
 export interface LogLine {
   seq: number;
@@ -60,7 +60,7 @@ export function snapshot() {
     const ms = xs.map((l) => l.ms!);
     return { calls: xs.length, errors: xs.filter((l) => !l.ok).length, p50: pct(ms, 50), p95: pct(ms, 95), recent: xs.slice(-40).map((l) => ({ ms: l.ms!, ok: l.ok })) };
   };
-  return { startedAt: new Date(startedAt).toISOString(), seq, providers: { paypal: stats("paypal"), gemini: stats("gemini"), channel3: stats("channel3") }, log: lines.slice(-200) };
+  return { startedAt: new Date(startedAt).toISOString(), seq, providers: { paypal: stats("paypal"), gemini: stats("gemini"), bedrock: stats("bedrock"), channel3: stats("channel3") }, log: lines.slice(-200) };
 }
 
 /** Load lines saved with the store (so a restarted instance keeps its recent history). */

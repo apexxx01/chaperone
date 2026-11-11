@@ -13,7 +13,7 @@
  */
 import { config } from "../config.ts";
 import type { Check, Mandate, PurchaseIntent } from "../domain/types.ts";
-import { generateJson } from "../agent/gemini.ts";
+import { generateJsonMeta } from "../agent/gemini.ts";
 import { decodeTags, sanitize, type Finding } from "./scanner.ts";
 import { mentions, type MarketStats } from "./policy.ts";
 
@@ -89,7 +89,7 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<{ value: T;
   return { value, hit: false };
 }
 
-export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = []): Promise<{ flags: ReaderFlags; confirmed: boolean[]; source: "gemini" | "heuristic"; ms: number }> {
+export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = []): Promise<{ flags: ReaderFlags; confirmed: boolean[]; source: "gemini" | "bedrock" | "heuristic"; ms: number }> {
   const t0 = performance.now();
   // Seller-controlled text only. The agent's own rationale is scanned separately; mixing it in here made
   // an honest "as the user requested" read like the page claiming approval.
@@ -102,11 +102,12 @@ export async function readUntrusted(intent: PurchaseIntent, confirm: string[] = 
   const schema = confirm.length
     ? { ...READER_SCHEMA, properties: { ...READER_SCHEMA.properties, requirementStated: { type: "array", items: { type: "boolean" }, minItems: confirm.length, maxItems: confirm.length } }, required: [...FLAG_KEYS, "requirementStated"] }
     : READER_SCHEMA;
-  const { value: flags } = await cached(`reader|${prompt}`, () => generateJson<ReaderFlags & { requirementStated?: boolean[] }>({ label: "quarantined reader", model: config.readerModel, system: READER_SYSTEM, prompt, schema }));
+  const { value: ans } = await cached(`reader|${prompt}`, () => generateJsonMeta<ReaderFlags & { requirementStated?: boolean[] }>({ label: "quarantined reader", model: config.readerModel, system: READER_SYSTEM, prompt, schema, fast: true }));
+  const flags = ans.value;
   const confirmed = confirm.map((_, i) => flags.requirementStated?.[i] === true);
   // Enforce the boolean-only contract even if the model misbehaves.
   const clean = Object.fromEntries(FLAG_KEYS.map((k) => [k, flags[k] === true])) as unknown as ReaderFlags;
-  return { flags: clean, confirmed, source: "gemini", ms: performance.now() - t0 };
+  return { flags: clean, confirmed, source: ans.provider, ms: performance.now() - t0 };
 }
 
 export async function audit(args: {
@@ -116,7 +117,7 @@ export async function audit(args: {
   deterministic: Check[];
   flags: ReaderFlags;
   findings: Finding[];
-}): Promise<{ result: AuditResult; source: "gemini" | "heuristic"; ms: number }> {
+}): Promise<{ result: AuditResult; source: "gemini" | "bedrock" | "heuristic"; ms: number }> {
   const t0 = performance.now();
   const { mandate: m, intent: it } = args;
   if (config.mode === "offline" || !config.geminiKey) {
@@ -140,8 +141,8 @@ export async function audit(args: {
     page_manipulation_flags: raised,
     scanner_findings: args.findings.map((f) => `${f.severity} ${f.kind}`),
   };
-  const { value } = await cached(`auditor|${JSON.stringify(facts)}`, () =>
-    generateJson<AuditResult>({
+  const { value: ans } = await cached(`auditor|${JSON.stringify(facts)}`, () =>
+    generateJsonMeta<AuditResult>({
       label: "privileged auditor",
       model: config.auditorModel,
       system: AUDITOR_SYSTEM,
@@ -149,11 +150,11 @@ export async function audit(args: {
       schema: AUDIT_SCHEMA,
     }),
   );
-  const result = structuredClone(value);
+  const result = structuredClone(ans.value);
   result.confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));
   result.concerns = (result.concerns ?? []).filter((c) => (CONCERNS as readonly string[]).includes(c) && c !== "none");
   result.summary = String(result.summary ?? "").slice(0, 240);
-  return { result, source: "gemini", ms: performance.now() - t0 };
+  return { result, source: ans.provider, ms: performance.now() - t0 };
 }
 
 // ── Offline heuristics (demo mode only, clearly labeled in the UI) ──────────

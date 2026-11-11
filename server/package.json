@@ -18,6 +18,7 @@
     "heldout": "tsx --env-file-if-exists=../.env src/redteam/heldout.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1166.0",
     "@google/genai": "^3.0.0",
     "@hono/node-server": "^2.1.6",
     "@modelcontextprotocol/sdk": "^1.32.2",

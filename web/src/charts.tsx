@@ -146,6 +146,7 @@ export function MoneyFlow({ purchases }: { purchases: Purchase[] }) {
 const PROVIDERS = [
   { id: "paypal", name: "PayPal" },
   { id: "gemini", name: "Gemini" },
+  { id: "bedrock", name: "Bedrock (backup AI)" },
   { id: "channel3", name: "Channel3" },
 ] as const;
 
@@ -167,7 +168,7 @@ export function providerStats(lines: LogLine[]) {
 }
 
 export function Health({ lines, now }: { lines: LogLine[]; now: number }) {
-  const st = providerStats(lines);
+  const st = providerStats(lines).filter((p) => p.id !== "bedrock" || p.calls > 0);
   return (
     <div className="health">
       {st.map((p) => {

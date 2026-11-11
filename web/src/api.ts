@@ -14,6 +14,7 @@ export interface Capabilities {
   mode: "live" | "offline";
   paypal: boolean;
   gemini: boolean;
+  bedrock?: boolean;
   channel3: boolean;
   paypalEnv: string;
   paymentMode: string;

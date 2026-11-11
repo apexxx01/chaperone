@@ -922,3 +922,4 @@ input[type="range"] { accent-color: var(--ink); width: 100%; }
   .kpi-label { white-space: normal; line-height: 1.25; min-height: 30px; }
 }
 .at-head .btn { flex: none; }
+.l-src.p-bedrock::before { border-radius: 2px; transform: rotate(45deg) scale(0.8); background: currentColor; }
