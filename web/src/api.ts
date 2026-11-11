@@ -35,9 +35,14 @@ export interface AppState {
 
 export class ApiError extends Error {}
 
-export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+export async function api<T = any>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
   const res = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const json = await res.json().catch(() => ({}));
+  // The server restarted and forgot this tab's session: get a fresh one and try once more.
+  if (res.status === 401 && json.code === "human_session_required" && !retried) {
+    await fetch("/api/session").catch(() => {});
+    return api<T>(method, path, body, true);
+  }
   if (!res.ok) throw new ApiError(json.error ?? `Request failed (${res.status})`);
   return json as T;
 }
