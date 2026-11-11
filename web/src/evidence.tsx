@@ -289,7 +289,7 @@ function HeldOut() {
   if (!r) return null;
   const row = hover != null ? r.rows[hover] : undefined;
   return (
-    <section className="cell wide">
+    <section className="cell wide" id="t-heldout">
       <header>
         <h3>Attacks nobody wrote rules for</h3>
         <p>

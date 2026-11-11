@@ -8,6 +8,7 @@ import { draftMandate, mandateFromDraft } from "../agent/mandate.ts";
 import { runShopper } from "../agent/shopper.ts";
 import { Chaperone, LifecycleError, explain } from "../lifecycle/service.ts";
 import { appendEvent, verifyChain } from "../lifecycle/receipt.ts";
+import { whatIf } from "../gate/whatif.ts";
 import { cachedListing, merchantFor, registry, searchListings, substituteFor } from "../market/catalog.ts";
 import type { PayPalApi } from "../paypal/types.ts";
 import { PayPalError } from "../paypal/types.ts";
@@ -212,6 +213,25 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
   app.get("/api/purchases/:id/receipt", (c) => {
     const p = chaperone.purchase(c.req.param("id"));
     return c.json({ purchaseId: p.id, intentId: p.intent.id, createdAt: p.intent.createdAt, paypal: p.paypal, chain: verifyChain(p), timeline: p.timeline });
+  });
+
+  // Re-run the real deterministic gate on a past purchase under different limits.
+  app.post("/api/purchases/:id/whatif", async (c) => {
+    const p = chaperone.purchase(c.req.param("id"));
+    const b = z
+      .object({
+        maxPerPurchase: z.number().optional(),
+        maxTotal: z.number().optional(),
+        autoApproveUnder: z.number().optional(),
+        maxOverMarketPct: z.number().optional(),
+        maxQuantity: z.number().optional(),
+        mustHave: z.array(z.string().max(60)).max(12).optional(),
+        blockMerchants: z.array(z.string().max(120)).max(20).optional(),
+      })
+      .parse(await c.req.json().catch(() => ({})));
+    const r = whatIf(p, chaperone.mandate(p.intent.mandateId), store.purchasesFor(p.intent.mandateId), registry, b);
+    tlog({ provider: "gate", op: "what-if replay", ms: r.ms, ok: true, note: `${r.before.decision} → ${r.after.decision}, ${r.changed.length} check(s) changed`, ref: p.id });
+    return c.json(r);
   });
 
   app.get("/api/purchases/:id", (c) => c.json({ purchase: chaperone.purchase(c.req.param("id")) }));

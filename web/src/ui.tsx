@@ -67,7 +67,7 @@ export function StateTag({ state }: { state: string }) {
 // ── Panels ───────────────────────────────────────────────────
 export function Pane({ title, hint, right, children, className = "", live, id }: { title: string; hint?: string; right?: ReactNode; children: ReactNode; className?: string; live?: boolean; id?: string }) {
   return (
-    <section className={`pane ${className}`} aria-labelledby={id ? `${id}-t` : undefined}>
+    <section className={`pane ${className}`} id={id} aria-labelledby={id ? `${id}-t` : undefined}>
       <header className="pane-head">
         <div className="pane-title">
           {live && <i className="livedot" aria-hidden />}

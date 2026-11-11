@@ -190,7 +190,7 @@ function DuelBoard({ d, s, open }: { d: Duel; s: AppState; open: (id: string) =>
         </div>
       )}
       {banner && <div className={`verdict ${banner.cls}`} role="status">{banner.text}</div>}
-      <div className="duel">
+      <div className="duel" id="t-duel">
         <Side
           kind="alone"
           title="Agent alone"

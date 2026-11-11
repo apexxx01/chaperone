@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, usd, type AppState, type LogLine, type Purchase } from "./api.ts";
 import { cumulative, Health, MoneyFlow, Spark, Waterfall } from "./charts.tsx";
 import { Num } from "./evidence.tsx";
@@ -13,6 +13,12 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
   const ps = useMemo(() => s.purchases.filter(inScope(scope)), [s.purchases, scope]);
   const [replay, setReplay] = useState<{ id: string; n: number } | undefined>();
   const selected = ps.find((p) => p.id === sel) ?? ps[0];
+  // The guided demo asks for a replay of whatever is selected.
+  useEffect(() => {
+    const go = () => selected && setReplay((r) => ({ id: selected.id, n: (r?.n ?? 0) + 1 }));
+    window.addEventListener("chaperone:replay", go);
+    return () => window.removeEventListener("chaperone:replay", go);
+  }, [selected]);
 
   const blocked = ps.filter((p) => p.state === "blocked");
   const heldNow = ps.filter((p) => ["authorized", "awaiting_delivery", "verifying"].includes(p.state));
@@ -34,7 +40,7 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
         <Seg value={scope} options={SCOPES} onChange={setScope} label="Which purchases" />
       </div>
 
-      <div className="kpis">
+      <div className="kpis" id="t-kpis">
         <Kpi label="Purchases proposed" value={ps.length} spark={cumulative(ps, () => 1)} />
         <Kpi label="Blocked before PayPal" value={blocked.length} spark={cumulative(blocked, () => 1)} bad />
         <Kpi label="Held in PayPal now" value={heldNow.reduce((a, p) => a + p.amount.value, 0)} money spark={cumulative(heldNow, (p) => p.amount.value)} />
@@ -44,6 +50,7 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
       </div>
 
       <Pane
+        id="t-map"
         title="System map"
         hint="the real backend, layer by layer"
         live
@@ -60,10 +67,10 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
       </Pane>
 
       <div className="row">
-        <Pane title="Trace" hint={selected ? selected.id : "no purchase selected"} className="span-7" right={selected && <button className="btn sm" onClick={() => open(selected.id)}>Every check and receipt <Icon name="arrow" size={14} /></button>}>
+        <Pane id="t-trace" title="Trace" hint={selected ? selected.id : "no purchase selected"} className="span-7" right={selected && <button className="btn sm" onClick={() => open(selected.id)}>Every check and receipt <Icon name="arrow" size={14} /></button>}>
           {selected ? <Trace p={selected} now={now} /> : <p className="readout">No purchases in this scope yet.</p>}
         </Pane>
-        <Pane title="Where the money went" hint="every proposed dollar" className="span-5">
+        <Pane id="t-money" title="Where the money went" hint="every proposed dollar" className="span-5">
           <MoneyFlow purchases={ps} />
         </Pane>
       </div>
@@ -72,7 +79,7 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
         <Pane title="Purchases" hint={`${ps.length} in scope · click to trace`} className="span-7">
           <Table ps={ps} sel={selected?.id} setSel={setSel} open={open} now={now} />
         </Pane>
-        <Pane title="Backend log" hint="every call, as it happens" live className="span-5 tall">
+        <Pane id="t-log" title="Backend log" hint="every call, as it happens" live className="span-5 tall">
           <Log lines={lines} setSel={setSel} now={now} />
         </Pane>
       </div>
@@ -81,7 +88,7 @@ export function ConsoleView({ s, lines, scope, setScope, sel, setSel, open, noti
         <Pane title="Needs you" hint="purchases waiting for a person" className="span-4">
           <Queue ps={ps.filter((p) => p.state === "held")} notify={notify} open={open} />
         </Pane>
-        <Pane title="Provider health" hint="latency of the last calls" live className="span-4">
+        <Pane id="t-health" title="Provider health" hint="latency of the last calls" live className="span-4">
           <Health lines={lines} now={now} />
         </Pane>
         <Pane title="Budgets" hint="signed mandates" className="span-4">

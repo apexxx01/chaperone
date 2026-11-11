@@ -3,7 +3,7 @@
 **Purchase protection for AI shopping agents, built on PayPal.** Agents can shop. Nothing moves until it's right.
 
 [![CI](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg)](https://github.com/apexxx01/chaperone/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-110%20passing-2f7d4f)
+![tests](https://img.shields.io/badge/tests-114%20passing-2f7d4f)
 ![license](https://img.shields.io/badge/license-MIT-0f5e5a)
 
 AI agents are starting to spend money for people, and they are easy to fool. [StakeBench](https://arxiv.org/abs/2606.13385) (2026) measured indirect prompt injection succeeding against GPT-5 and Gemini 2.5 Flash web agents **41.67% to 68.59%** of the time.
@@ -130,6 +130,8 @@ The web app is a live mirror of the backend, not a mockup of it. Every PayPal re
 - **Trace**: pick any purchase and see its gate waterfall (the two Gemini calls run side by side) and its hash-chained timeline.
 - **Where the money went**: every proposed dollar, from proposal through the gate into PayPal, captured, voided or still held.
 - **Backend log** and **provider health**: the raw call log with p50/p95 and error rate per provider. Gemini quota errors show up here as they happen, and the gate fails closed on them.
+- **What-if replay**: in any purchase's receipts, drag its limits and the server re-runs the same deterministic gate on that exact purchase (`server/src/gate/whatif.ts`), showing which checks flip. Nothing is saved or charged.
+- **Guided tour**: the Tour button (or `?tour=1` on the URL) walks through the live system in about a minute, spotlighting real panels.
 - **Command palette** (⌘K or `/`): jump to a view, run any duel, open any purchase.
 
 ## Repo map

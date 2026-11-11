@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, clock, usd, type Check, type Purchase } from "./api.ts";
+import { WhatIf } from "./whatif.tsx";
 
 // ── Money lane ───────────────────────────────────────────────
 const STOPS = ["Proposed", "Checked", "Held", "Delivered", "Paid"] as const;
@@ -169,6 +170,8 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
           <h3 style={{ marginBottom: 10 }}>Why ({p.verdict.checks.length} checks, {p.verdict.ms} ms)</h3>
           <div className="checks">{sorted.map((c, i) => <CheckRow key={i} c={c} />)}</div>
         </section>
+
+        <WhatIf p={p} />
 
         <section className="section" style={{ marginTop: 24 }}>
           <h3 style={{ marginBottom: 10 }}>Timeline</h3>
