@@ -20,7 +20,8 @@ Most "agent wallet" tools stop at *should the agent buy this?* Chaperone covers 
 
 | | |
 |---|---|
-| **Live demo** | https://chaperone-ku2k.onrender.com (opens on the control room; ⌘K jumps anywhere) |
+| **Live demo** | https://chaperone-ku2k.onrender.com · guided tour: https://chaperone-ku2k.onrender.com/?tour=1 |
+| **PayPal sandbox buyer** (for "Approve with PayPal") | `sb-1ezxw53857958@personal.example.com` · password `(#A4tDCd` (sandbox money only) |
 | **One command (no keys)** | `docker compose -f repro/compose.yaml up` → http://localhost:8787 |
 | **From source** | `npm ci && npm run build -w web && npm run demo` |
 | **Red team** | `npm run redteam` (offline) or with keys in `.env` for the PayPal sandbox |

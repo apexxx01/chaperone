@@ -287,6 +287,7 @@ export function MandateDoc({ m, notify, purchases = [] }: { m: Mandate; notify: 
           <>
             <button className="btn paypal" disabled={busy} onClick={sign}>{busy ? "Opening PayPal…" : "Approve with PayPal"}</button>
             <span className="faint" style={{ fontSize: 13 }}>One approval. Your wallet is saved for these limits only; every purchase is held until it arrives right.</span>
+            <JudgeLogin />
           </>
         )}
       </div>
@@ -387,5 +388,31 @@ export function HowView({ s }: { s: AppState }) {
         </p>
       </div>
     </>
+  );
+}
+
+/** PayPal sandbox buyer for judges. Sandbox money only; this account exists for trying the demo. */
+const JUDGE = { email: "sb-1ezxw53857958@personal.example.com", password: "(#A4tDCd" };
+function JudgeLogin() {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (k: string, v: string) => {
+    navigator.clipboard?.writeText(v).then(() => {
+      setCopied(k);
+      setTimeout(() => setCopied(null), 1400);
+    }, () => {});
+  };
+  return (
+    <div className="judge">
+      <b>Trying it out? Log in to PayPal with this sandbox buyer</b>
+      <span>Fake sandbox money. Pay with the saved Visa, not a bank.</span>
+      <div className="judge-row">
+        <code>{JUDGE.email}</code>
+        <button className="copy" onClick={() => copy("e", JUDGE.email)}>{copied === "e" ? "Copied" : "Copy"}</button>
+      </div>
+      <div className="judge-row">
+        <code>{JUDGE.password}</code>
+        <button className="copy" onClick={() => copy("p", JUDGE.password)}>{copied === "p" ? "Copied" : "Copy"}</button>
+      </div>
+    </div>
   );
 }
