@@ -61,7 +61,8 @@ export function Lane({ p, current, onOpen }: { p: Purchase; current?: boolean; o
 const STAGE_NAME: Record<string, string> = { mandate: "Mandate", policy: "Policy", market: "Channel3", scanner: "Scanner", auditor: "AI auditor", human: "You", delivery: "Delivery" };
 
 export function CheckRow({ c }: { c: Check }) {
-  const data = c.data ? Object.entries(c.data).filter(([, v]) => v !== null && v !== "" && typeof v !== "boolean") : [];
+  // Long series and links are drawn elsewhere (the Channel3 panel), not dumped as raw data.
+  const data = c.data ? Object.entries(c.data).filter(([k, v]) => v !== null && v !== "" && typeof v !== "boolean" && !["series", "offers", "altUrl"].includes(k)) : [];
   return (
     <div className={`check ${c.outcome}`}>
       <span className="mark" aria-label={c.outcome}>{c.outcome === "pass" ? "✓" : c.outcome === "warn" ? "!" : "×"}</span>
