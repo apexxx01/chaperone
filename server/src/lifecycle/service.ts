@@ -10,6 +10,7 @@
  *                                            ├─ partial ─▶ partial capture (rest released) ─▶ payout
  *                                            └─ mismatch ─▶ void (money never moved)
  */
+import { config } from "../config.ts";
 import type { DeliveryReport, Mandate, Purchase, PurchaseIntent } from "../domain/types.ts";
 import { runGate } from "../gate/pipeline.ts";
 import { round2 } from "../gate/policy.ts";
@@ -127,7 +128,9 @@ export class Chaperone {
         softDescriptor: "CHAPERONE",
         // Arena and card-mode mandates carry a marker, not a vault token: those authorize on PayPal's sandbox test card.
         vaultId: m.paymentTokenId === "sandbox-test-card" || m.paymentTokenId === "sim-vault-token" ? undefined : m.paymentTokenId,
+        payeeEmail: config.paypal.sellerPayee,
       });
+      if (config.paypal.sellerPayee) p.paypal.payee = config.paypal.sellerPayee;
       p.paypal.orderId = r.orderId;
       p.paypal.authorizationId = r.authorizationId;
       if (r.debugId) p.paypal.debugIds.push(r.debugId);
@@ -213,6 +216,14 @@ export class Chaperone {
             }
           }
           const tp = performance.now();
+          if (p.paypal.payee) {
+            // The order was made out to the seller from the start: the capture itself paid them.
+            p.state = "seller_paid";
+            this.event(p, "payout", `Seller paid directly by the capture: $${amount.toFixed(2)} → ${p.paypal.payee}`, `Order made out to the seller's PayPal account. Chaperone never held the funds.`, performance.now() - tp);
+            this.store.savePurchase(p);
+            this.refreshTotals(m);
+            return p;
+          }
           const po = await this.paypal.payout({ requestId: `pay-${p.id}`, receiverEmail: p.intent.listing.merchant.payoutEmail, amount, note: `Payment for verified delivery: ${p.intent.listing.title.slice(0, 80)} (${p.id})`, purchaseId: p.id });
           p.paypal.payoutBatchId = po.batchId;
           p.state = "seller_paid";

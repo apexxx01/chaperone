@@ -156,6 +156,8 @@ export interface Purchase {
     capturedAmount?: number;
     payoutBatchId?: string;
     refundId?: string;
+    /** Set when the order was made out to the seller directly (no Payouts hop). */
+    payee?: string;
     debugIds: string[];
   };
   delivery?: DeliveryReport;

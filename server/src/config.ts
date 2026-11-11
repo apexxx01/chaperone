@@ -11,6 +11,8 @@ export const config = {
     clientSecret: env.PAYPAL_CLIENT_SECRET ?? "",
     env: (env.PAYPAL_ENV ?? "sandbox") as "sandbox" | "live",
     paymentMode: (env.PAYPAL_PAYMENT_MODE ?? "vault") as "vault" | "card",
+    /** When set, every order is made out to this seller merchant (Orders v2 payee): capture pays them directly, no Payouts hop. */
+    sellerPayee: env.PAYPAL_SELLER_PAYEE?.trim() || undefined,
     webhookId: env.PAYPAL_WEBHOOK_ID ?? "",
   },
   geminiKey: env.GEMINI_API_KEY ?? "",
@@ -38,5 +40,7 @@ export function capabilities() {
     bedrock: !offline && !!config.geminiKey && !process.env.BEDROCK_DISABLED && Boolean((process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || process.env.AWS_PROFILE || process.env.AWS_BEARER_TOKEN_BEDROCK),
     paypalEnv: config.paypal.env,
     paymentMode: config.paypal.paymentMode,
+    /** Orders are made out to the seller's own PayPal account; Chaperone never holds the funds. */
+    directToSeller: !offline && !!config.paypal.sellerPayee,
   };
 }

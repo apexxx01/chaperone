@@ -235,3 +235,24 @@ describe("simulated PayPal enforces real state rules", () => {
     await expect(pp.refund(c.captureId, { requestId: "rf", amount: 20, note: "x" })).rejects.toThrow(/exceeds/);
   });
 });
+
+describe("orders made out to the seller (direct mode)", () => {
+  it("the hold and capture belong to the seller, and no Payouts hop is made", async () => {
+    const { config } = await import("../src/config.ts");
+    const before = config.paypal.sellerPayee;
+    config.paypal.sellerPayee = "seller@business.example.com";
+    try {
+      let payouts = 0;
+      const orig = pp.payout.bind(pp);
+      pp.payout = async (o) => (payouts++, orig(o));
+      const p = await ch.propose(intent());
+      expect(p.paypal.payee).toBe("seller@business.example.com");
+      const done = await ch.deliver(p.id, delivered());
+      expect(done.state).toBe("seller_paid");
+      expect(payouts).toBe(0);
+      expect(done.timeline.some((e) => /paid directly by the capture/.test(e.label))).toBe(true);
+    } finally {
+      config.paypal.sellerPayee = before;
+    }
+  });
+});

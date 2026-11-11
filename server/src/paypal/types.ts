@@ -16,6 +16,8 @@ export interface AuthorizeRequest {
   invoiceId: string;
   softDescriptor?: string;
   vaultId?: string;
+  /** The seller's PayPal account. The order, its hold and its capture belong to them, not to Chaperone. */
+  payeeEmail?: string;
 }
 
 export interface AuthorizeResult {

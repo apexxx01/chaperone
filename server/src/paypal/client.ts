@@ -95,6 +95,7 @@ export class PayPalSandbox implements PayPalApi {
         {
           reference_id: req.customId,
           custom_id: req.customId,
+          ...(req.payeeEmail ? { payee: { email_address: req.payeeEmail } } : {}),
           invoice_id: req.invoiceId,
           description: req.description.slice(0, 127),
           soft_descriptor: req.softDescriptor?.slice(0, 22),
