@@ -65,9 +65,30 @@ export interface Answered<T> {
   model: string;
 }
 
+/**
+ * Which provider goes first. AI_PRIMARY=bedrock puts Amazon Nova first (Gemini becomes the backup).
+ * Otherwise Gemini goes first, until it reports its quota is used up: then Nova leads for 10 minutes
+ * instead of every call paying for a failed Gemini attempt first.
+ */
+let geminiOutUntil = 0;
+export const novaFirst = () => bedrockEnabled() && (process.env.AI_PRIMARY === "bedrock" || Date.now() < geminiOutUntil);
+function noteQuota(e: unknown) {
+  if (/\b429\b|RESOURCE_EXHAUSTED|exceeded your current quota/i.test(String((e as Error)?.message ?? e))) geminiOutUntil = Date.now() + 10 * 60_000;
+}
+
 /** Structured output call: the model can only answer in this JSON shape. Falls back to Bedrock when Gemini can't answer. */
 export async function generateJsonMeta<T>(opts: { model: string; system: string; prompt: string; schema: object; temperature?: number; image?: { mime: string; data: string }; label?: string; fast?: boolean }): Promise<Answered<T>> {
   let model = opts.model;
+  const triedNova = novaFirst();
+  if (triedNova) {
+    try {
+      const r = await bedrockJson<T>({ system: opts.system, prompt: opts.prompt, schema: opts.schema, temperature: opts.temperature, image: opts.image, label: opts.label, fast: opts.fast });
+      lastModelUsed = r.model;
+      return { value: r.value, provider: "bedrock", model: r.model };
+    } catch {
+      // Nova couldn't answer: Gemini is the backup.
+    }
+  }
   try {
     const res = await withRetry((m) => {
       model = m;
@@ -89,7 +110,8 @@ export async function generateJsonMeta<T>(opts: { model: string; system: string;
       throw new Error(`502 Gemini returned non-JSON output: ${text.slice(0, 200)}`);
     }
   } catch (e) {
-    if (!bedrockEnabled() || !retryable(e)) throw e;
+    noteQuota(e);
+    if (triedNova || !bedrockEnabled() || !retryable(e)) throw e;
     const r = await bedrockJson<T>({ system: opts.system, prompt: opts.prompt, schema: opts.schema, temperature: opts.temperature, image: opts.image, label: opts.label, fast: opts.fast });
     lastModelUsed = r.model;
     return { value: r.value, provider: "bedrock", model: r.model };
@@ -101,6 +123,16 @@ export async function generateJson<T>(opts: Parameters<typeof generateJsonMeta>[
 }
 
 export async function generateWithTools(opts: { model: string; system: string; contents: Content[]; tools: FunctionDeclaration[]; temperature?: number }) {
+  const triedNova = novaFirst();
+  if (triedNova) {
+    try {
+      const r = await bedrockTools(opts);
+      lastModelUsed = r.model;
+      return { ...r, provider: "bedrock" as const };
+    } catch {
+      // fall back to Gemini
+    }
+  }
   try {
     const res = await withRetry((model) =>
       gemini().models.generateContent({
@@ -117,7 +149,8 @@ export async function generateWithTools(opts: { model: string; system: string; c
     );
     return { candidates: res.candidates, functionCalls: res.functionCalls, provider: "gemini" as const, model: lastModelUsed };
   } catch (e) {
-    if (!bedrockEnabled() || !retryable(e)) throw e;
+    noteQuota(e);
+    if (triedNova || !bedrockEnabled() || !retryable(e)) throw e;
     const r = await bedrockTools(opts);
     lastModelUsed = r.model;
     return { ...r, provider: "bedrock" as const };
