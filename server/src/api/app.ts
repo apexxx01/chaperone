@@ -411,9 +411,16 @@ export function createApp(store: Store, rawPaypal: PayPalApi) {
       if (type === "PAYMENT.AUTHORIZATION.VOIDED" && ["authorized", "awaiting_delivery"].includes(p.state)) {
         p.state = "voided";
         appendEvent(p, { at: new Date().toISOString(), kind: "voided", label: "PayPal reports the authorization was voided or expired", detail: "The money was never captured." });
-      } else if ((type === "PAYMENT.CAPTURE.REFUNDED" || type === "PAYMENT.CAPTURE.REVERSED") && ["captured", "seller_paid"].includes(p.state)) {
+      } else if (type === "PAYMENT.CAPTURE.REVERSED" && ["captured", "seller_paid"].includes(p.state)) {
         p.state = "refunded";
-        appendEvent(p, { at: new Date().toISOString(), kind: "refunded", label: type.endsWith("REVERSED") ? "PayPal reversed the capture" : "PayPal reports a refund", detail: `$${r.amount?.value ?? "?"}` });
+        appendEvent(p, { at: new Date().toISOString(), kind: "refunded", label: "PayPal reversed the capture", detail: `$${r.amount?.value ?? "?"}` });
+      } else if (type === "PAYMENT.CAPTURE.REFUNDED" && ["captured", "seller_paid"].includes(p.state) && !(p.paypal.refundIds ?? [p.paypal.refundId]).includes(r.id)) {
+        // A refund made outside Chaperone (the PayPal dashboard, a dispute). Ours are already on the books.
+        const amt = Number(r.amount?.value ?? 0);
+        p.paypal.refundedAmount = Math.round(((p.paypal.refundedAmount ?? 0) + amt) * 100) / 100;
+        const left = Math.round(((p.paypal.capturedAmount ?? p.amount.value) - p.paypal.refundedAmount) * 100) / 100;
+        if (left <= 0) p.state = "refunded";
+        appendEvent(p, { at: new Date().toISOString(), kind: "refunded", label: `PayPal reports a $${amt.toFixed(2)} refund made outside Chaperone`, detail: left > 0 ? `$${left.toFixed(2)} still captured` : "Now refunded in full" });
       } else if (type === "PAYMENT.CAPTURE.DENIED" && p.state === "captured") {
         p.state = "awaiting_delivery";
         appendEvent(p, { at: new Date().toISOString(), kind: "error", label: "PayPal denied the capture", detail: "Nothing was paid to the seller." });

@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/apexxx01/chaperone/actions/workflows/ci.yml"><img src="https://github.com/apexxx01/chaperone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-145%20passing-111111" alt="145 tests passing">
+  <img src="https://img.shields.io/badge/tests-148%20passing-111111" alt="148 tests passing">
   <img src="https://img.shields.io/badge/PayPal-Orders%20v2%20%C2%B7%20Vault%20%C2%B7%20Payouts-111111" alt="PayPal APIs">
   <img src="https://img.shields.io/badge/AI-Gemini%20%2B%20Bedrock%20Nova-111111" alt="Gemini and Bedrock">
   <img src="https://img.shields.io/badge/catalog-Channel3-111111" alt="Channel3">
@@ -162,7 +162,7 @@ The 21 attacks: instructions addressed to the AI, Unicode tag smuggling, fake `S
 | Orders: add tracking | Carrier tracking attached after capture |
 | Payouts | Seller paid only after verified delivery; a failed payout can be retried and can't pay twice |
 | Transaction Search | Ledger view: PayPal's own record of each authorization next to Chaperone's |
-| Webhooks + signature verification | `PAYMENT.*` events on the purchase timeline |
+| Webhooks + signature verification | `PAYMENT.*` events on the purchase timeline, verified against PayPal before anything changes; refunds, voids and reversals made outside Chaperone are mirrored (see the UGREEN charger's receipt for a live one) |
 | `PayPal-Request-Id` on every POST | Safe retries, no double charges |
 
 ## How Channel3 is used

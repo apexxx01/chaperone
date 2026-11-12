@@ -342,6 +342,7 @@ export class Chaperone {
       const n = (p.paypal.refundCount ?? 0) + 1;
       const r = await this.paypal.refund(p.paypal.captureId, { requestId: `ref-${p.id}-${n}`, amount: amt, note: reason });
       p.paypal.refundId = r.refundId;
+      p.paypal.refundIds = [...(p.paypal.refundIds ?? []), r.refundId];
       p.paypal.refundCount = n;
       p.paypal.refundedAmount = round2((p.paypal.refundedAmount ?? 0) + amt);
       if (r.debugId) p.paypal.debugIds.push(r.debugId);

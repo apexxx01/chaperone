@@ -197,6 +197,22 @@ describe("who may move money", () => {
     expect(r.status).toBe(401);
     if (p) expect(JSON.stringify((await call("GET", `/api/purchases/${p.id}`)).json.purchase.timeline)).toBe(before);
   });
+  it("a signed refund webhook for our own partial refund changes nothing; one made outside Chaperone is mirrored", async () => {
+    const s = (await call("GET", "/api/state")).json;
+    const p = s.purchases.find((x: any) => x.state === "seller_paid");
+    expect(p).toBeTruthy();
+    const mine = (await call("POST", `/api/purchases/${p.id}/refund`, { reason: "dent", amount: 1 })).json.purchase;
+    const hook = (id: string, resource: object) => app.request("/api/paypal/webhook", { method: "POST", headers: { "Content-Type": "application/json", "paypal-transmission-sig": "chaperone-simulator" }, body: JSON.stringify({ id, event_type: "PAYMENT.CAPTURE.REFUNDED", resource }) });
+    expect((await hook("WH-own", { id: mine.paypal.refundId, custom_id: p.id, amount: { value: "1.00" } })).status).toBe(200);
+    let now = (await call("GET", `/api/purchases/${p.id}`)).json.purchase;
+    expect(now.state).toBe("seller_paid");
+    expect(now.paypal.refundedAmount).toBe(1);
+    const left = (now.paypal.capturedAmount ?? now.amount.value) - 1;
+    await hook("WH-ext", { id: "EXTREFUND1", custom_id: p.id, amount: { value: left.toFixed(2) } });
+    now = (await call("GET", `/api/purchases/${p.id}`)).json.purchase;
+    expect(now.state).toBe("refunded");
+    expect(now.timeline.some((e: any) => /outside Chaperone/.test(e.label))).toBe(true);
+  });
   it("pages carry a strict CSP, no framing and nosniff", async () => {
     const r = await app.request("/api/session");
     expect(r.headers.get("content-security-policy")).toMatch(/script-src 'self';.*frame-ancestors 'none'/);

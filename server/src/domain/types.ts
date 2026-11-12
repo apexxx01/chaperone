@@ -158,6 +158,7 @@ export interface Purchase {
     refundId?: string;
     /** Total refunded so far, across partial refunds. */
     refundedAmount?: number;
+    refundIds?: string[];
     refundCount?: number;
     authorizedAt?: string;
     /** When PayPal says this authorization lapses (expiration_time). */
