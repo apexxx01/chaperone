@@ -391,7 +391,7 @@ export function HowView({ s }: { s: AppState }) {
       </Pane>
       <div className="cols">
         <div><h3>Code decides facts</h3><p>Caps, budget, quantity, specs, lookalike stores, payee identity and price vs. the same product's offers on Channel3 are plain code. Page text is never an input to an amount.</p></div>
-        <div><h3>AI judges, quarantined</h3><p>A Gemini reader looks at the untrusted page and can only answer yes/no flags. A second Gemini auditor sees your words and the facts, never the page, so injected text has no path to it.</p></div>
+        <div><h3>AI judges, quarantined</h3><p>An AI reader looks at the untrusted page and can only answer yes/no flags. A second AI auditor sees your words and the facts, never the page, so injected text has no path to it.</p></div>
         <div><h3>You make the close calls</h3><p>Anything over your auto-approve limit, from an unverified seller, or a bit pricey waits for one tap. Fail closed: if the AI is down, it waits for you.</p></div>
         <div><h3>PayPal holds the money</h3><p>Purchases are authorized, not captured. Sellers are paid with Payouts only after delivery checks out. Wrong item: void. Short shipment: capture only what arrived.</p></div>
       </div>
@@ -399,7 +399,7 @@ export function HowView({ s }: { s: AppState }) {
         <h2>PayPal primitives in use</h2>
         <div className="prims">{prims.map((p) => <code key={p}>{p}</code>)}</div>
         <p className="faint" style={{ fontSize: 14, marginTop: 16 }}>
-          Running against: PayPal {caps.paypalClient === "sandbox" ? `sandbox (${caps.paymentMode})` : "simulator (offline demo)"} · AI {caps.gemini ? "Gemini" : "offline heuristics"} · Products {caps.channel3 ? "Channel3 live" : "offline catalog"} · {s.sellers} verified sellers
+          Running against: PayPal {caps.paypalClient === "sandbox" ? `sandbox (${caps.paymentMode})` : "simulator (offline demo)"} · AI {caps.gemini ? (caps.bedrock ? "Gemini + Amazon Nova backup" : "Gemini") : "offline heuristics"} · Products {caps.channel3 ? "Channel3 live" : "offline catalog"} · {s.sellers} verified sellers
         </p>
       </div>
     </>

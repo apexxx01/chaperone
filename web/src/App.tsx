@@ -28,6 +28,12 @@ export function App() {
   const now = useNow(1000);
   const [tab, setTab] = useState<Tab>(() => (TABS.some((t) => t.id === location.hash.slice(1)) ? (location.hash.slice(1) as Tab) : "console"));
   const [openId, setOpenId] = useState<string | undefined>();
+  // Deep link for scripted walkthroughs and the tour: dispatch "chaperone:open" with a purchase id.
+  useEffect(() => {
+    const open = (e: Event) => setOpenId((e as CustomEvent<string>).detail);
+    window.addEventListener("chaperone:open", open);
+    return () => window.removeEventListener("chaperone:open", open);
+  }, []);
   const [sel, setSel] = useState<string | undefined>();
   const [scope, setScope] = useState<Scope>(() => {
     try {
@@ -199,9 +205,9 @@ export function App() {
       { target: "#t-map", title: "Every purchase runs the real gate", body: "Signed limits, then Channel3's catalog (is this a real retailer of this exact product, at this price?), an injection scanner, then two Gemini models that never talk to each other. Watch this attack fly through and get stopped.", enter: toConsole, shown: () => window.dispatchEvent(new Event("chaperone:replay")) },
       { target: "#t-trace", title: "Why it stopped, to the millisecond", body: "Each check as the server timed it. The two AI calls run side by side. Below, a hash-chained receipt that your browser re-verifies, so you don't have to trust the server.", enter: toConsole },
       { target: "#t-money", title: "Money waits in PayPal", body: "Approved purchases are only authorized, never captured, until you confirm the right item arrived. Red is money that never reached a seller.", enter: toConsole },
-      { target: "#t-log", title: "The backend, call by call", body: "Every PayPal REST call, Gemini call and Channel3 search, streamed as it happens. When Gemini hits a quota limit, you see it here, and the gate fails closed: it asks you instead of guessing.", enter: toConsole },
+      { target: "#t-log", title: "The backend, call by call", body: "Every PayPal REST call, AI call and Channel3 search, streamed as it happens. When Gemini hits a quota limit, you see it here, and the gate fails closed: it asks you instead of guessing.", enter: toConsole },
       { target: ".drawer .whatif", title: "Change the rules, re-run the gate", body: "This purchase was paid. Drag its limits and the server re-runs the same deterministic gate on it, showing which checks flip. Here the cap drops below the price, and it would have been blocked. Nothing is saved or charged.", enter: () => { toConsole(); if (honest) setOpenId(honest.id); }, shown: () => setTimeout(() => window.dispatchEvent(new Event("chaperone:whatif-demo")), 900) },
-      { target: "#t-duel", title: "Same agent, same scam, two endings", body: "One real Gemini agent shopped twice with the same poisoned search results. Alone, it charged the buyer for the attacker's listing on the spot. Through Chaperone, the purchase was stopped before any money moved.", enter: () => { setOpenId(undefined); setTab("arena"); } },
+      { target: "#t-duel", title: "Same agent, same scam, two endings", body: "One real AI agent shopped twice with the same poisoned search results. Alone, it charged the buyer for the attacker's listing on the spot. Through Chaperone, the purchase was stopped before any money moved.", enter: () => { setOpenId(undefined); setTab("arena"); } },
       { target: "#t-heldout", title: "Attacks nobody wrote rules for", body: "After the gate was finished, a separate model invented 20 brand-new attacks. 19 were blocked, 1 was held for a human, none got money past the gate.", enter: () => { setOpenId(undefined); setTab("redteam"); } },
       { target: ".forge", title: "Now try to rob it yourself", body: "Pick an attack or write your own, then run a live duel. Press ⌘K any time to jump anywhere or open any purchase.", enter: () => { setOpenId(undefined); setTab("arena"); } },
     ];

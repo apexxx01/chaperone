@@ -71,7 +71,7 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
         <div>
           <h1 className="title">Try to rob this agent.</h1>
           <p className="lede">
-            One real Gemini agent, sent shopping twice with the same poisoned search results. Alone, it holds PayPal directly. With Chaperone, every purchase runs the gate below, and the money waits in PayPal until the right thing arrives.
+            One real AI agent (Gemini, with Amazon Nova as backup), sent shopping twice with the same poisoned search results. Alone, it holds PayPal directly. With Chaperone, every purchase runs the gate below, and the money waits in PayPal until the right thing arrives.
           </p>
         </div>
       </div>
@@ -144,7 +144,7 @@ export function ArenaView({ s, notify, open, lines }: { s: AppState; notify: Not
 
       {duel ? <DuelBoard d={duel} s={s} open={open} /> : <div className="empty" style={{ marginTop: 32 }}>No duels yet. Run the first one.</div>}
 
-      <Pane title="Backend, call by call" hint="every agent turn, Gemini call, Channel3 search, gate decision and PayPal request behind the Arena" live className="arena-log">
+      <Pane title="Backend, call by call" hint="every agent turn, AI call, Channel3 search, gate decision and PayPal request behind the Arena" live className="arena-log">
         <Log lines={arenaLines} now={now} max={60} />
       </Pane>
 

@@ -15,8 +15,8 @@ export function Waterfall({ p }: { p: Purchase }) {
     { label: "Channel3 market lookup", start: 0, dur: market, kind: "io" },
     { label: "Policy, plain code", start: market, dur: 0.6, kind: "code" },
     { label: "Injection scanner", start: market, dur: 0.4, kind: "code" },
-    { label: "Quarantined reader (Gemini)", start: market, dur: reader, kind: "ai", off: !p.verdict.checks.some((c) => c.rule === "auditor.quarantined_reader") },
-    { label: "Privileged auditor (Gemini)", start: market, dur: auditor, kind: "ai", off: !p.verdict.checks.some((c) => c.rule === "auditor.mandate_alignment") },
+    { label: "Quarantined reader (AI)", start: market, dur: reader, kind: "ai", off: !p.verdict.checks.some((c) => c.rule === "auditor.quarantined_reader") },
+    { label: "Privileged auditor (AI)", start: market, dur: auditor, kind: "ai", off: !p.verdict.checks.some((c) => c.rule === "auditor.mandate_alignment") },
     { label: `Decision: ${p.verdict.decision}`, start: gate, dur: 0, kind: p.verdict.decision === "block" ? "stop" : "mark" },
     ...(auth ? [{ label: "PayPal authorize (hold)", start: gate, dur: auth.ms ?? 0, kind: "paypal" }] : []),
   ].filter((s) => !("off" in s && s.off));
@@ -43,7 +43,7 @@ export function Waterfall({ p }: { p: Purchase }) {
         </div>
       ))}
       <p className="readout">
-        {hover != null ? `${spans[hover]!.label}: starts at ${fmtMs(spans[hover]!.start)}, takes ${fmtMs(spans[hover]!.dur)}.` : `Gate ${fmtMs(p.verdict.ms)}. The two Gemini calls run side by side; everything else is sub-millisecond code.`}
+        {hover != null ? `${spans[hover]!.label}: starts at ${fmtMs(spans[hover]!.start)}, takes ${fmtMs(spans[hover]!.dur)}.` : `Gate ${fmtMs(p.verdict.ms)}. The two AI calls run side by side; everything else is sub-millisecond code.`}
       </p>
     </div>
   );

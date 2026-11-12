@@ -302,7 +302,7 @@ export function Log({ lines, setSel, now, max = 80 }: { lines: LogLine[]; setSel
             </motion.li>
           ))}
         </AnimatePresence>
-        {!shown.length && <li className="empty-line">Waiting for the backend. Run a duel or send your agent shopping and every PayPal, Gemini and Channel3 call shows up here.</li>}
+        {!shown.length && <li className="empty-line">Waiting for the backend. Run a duel or send your agent shopping and every PayPal, AI and Channel3 call shows up here.</li>}
       </ul>
     </div>
   );

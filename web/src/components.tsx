@@ -141,7 +141,7 @@ export function Drawer({ p, onClose, notify }: { p: Purchase; onClose: () => voi
         {p.state === "awaiting_delivery" && (
           <div className="panel" style={{ marginBottom: 16 }}>
             <h3>What showed up?</h3>
-            <p className="muted" style={{ margin: "4px 0 12px", fontSize: 14 }}>Only your word releases the money. Add a photo of the item or its label and Gemini checks it against the order.</p>
+            <p className="muted" style={{ margin: "4px 0 12px", fontSize: 14 }}>Only your word releases the money. Add a photo of the item or its label and the AI checks it against the order.</p>
             <div className="field" style={{ marginBottom: 12 }}>
               <label htmlFor="proof">Proof photo (optional)</label>
               <input id="proof" className="input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => pickPhoto(e.target.files?.[0])} />

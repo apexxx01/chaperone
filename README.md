@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/H8u_KL11Qyk"><b>▶ Demo video (2:53)</b></a> ·
   <a href="https://chaperone-ku2k.onrender.com/?tour=1"><b>Live demo + 60-second tour</b></a> ·
   <a href="#try-it">Run it</a> ·
   <a href="#receipts">Receipts</a> ·
@@ -24,6 +25,10 @@
   <img src="https://img.shields.io/badge/AI-Gemini%20%2B%20Bedrock%20Nova-111111" alt="Gemini and Bedrock">
   <img src="https://img.shields.io/badge/catalog-Channel3-111111" alt="Channel3">
   <img src="https://img.shields.io/badge/license-MIT-111111" alt="MIT license">
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/H8u_KL11Qyk"><img src="docs/video-thumbnail.png" width="720" alt="Watch the 2:53 demo: we let an AI agent get scammed 21 times, then gave it Chaperone"></a>
 </p>
 
 <p align="center">
@@ -70,6 +75,7 @@ The agent's key can search and propose. It can't approve, confirm a delivery or 
 
 | | |
 |---|---|
+| **Demo video** | https://youtu.be/H8u_KL11Qyk (2:53) |
 | **Live demo** | https://chaperone-ku2k.onrender.com · guided tour: https://chaperone-ku2k.onrender.com/?tour=1 |
 | **PayPal sandbox buyer** (for "Approve with PayPal") | `sb-1ezxw53857958@personal.example.com` · password `(#A4tDCd` (sandbox money only) |
 | **One command (no keys)** | `docker compose -f repro/compose.yaml up` → http://localhost:8787 |
